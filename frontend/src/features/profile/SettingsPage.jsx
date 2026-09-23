@@ -62,7 +62,7 @@ export default function SettingsPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `gyangrid-my-data-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `gyaangrid-my-data-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
       toast.success('Your data has been downloaded.');

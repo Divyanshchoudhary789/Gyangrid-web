@@ -1,6 +1,6 @@
-# GyanGrid — Web Frontend (React)
+# Gyaangrid — Web Frontend (React)
 
-The responsive web frontend for **GyanGrid**, an AI-powered Mathematics tutor for Classes 6–10 (NCERT / CBSE), built from *PRD v2.0 (Developer Specification)*.
+The responsive web frontend for **Gyaangrid**, an AI-powered Mathematics tutor for Classes 6–10 (NCERT / CBSE), built from *PRD v2.0 (Developer Specification)*.
 
 It has two surfaces:
 
@@ -14,7 +14,7 @@ Everything currently runs against an **in-browser mock API** that follows the PR
 ## Quick start
 
 ```bash
-cd gyangrid-web
+cd frontend
 npm install
 npm run dev          # http://localhost:5173
 ```
@@ -27,15 +27,15 @@ Requires Node 18+ (tested on Node 22).
 
 | Surface | Login | Notes |
 |---|---|---|
-| Student | `demo@gyangrid.in` / `Demo@1234` | Class 8 student with about 3 weeks of history: streak, mistakes, tests and doubts. The login page has a **Fill in** button. |
+| Student | `demo@gyaangrid.in` / `Demo@1234` | Class 8 student with about 3 weeks of history: streak, mistakes, tests and doubts. The login page has a **Fill in** button. |
 | Student (Google) | "Continue with Google", then pick an account | "Use another account" creates a new student and goes through onboarding. |
-| Admin: Super Admin | `superadmin@gyangrid.in` / `Admin@1234` | 2FA code `123456` |
-| Admin: Content Manager | `content@gyangrid.in` / `Content@1234` | Can edit content. Config is read-only. |
-| Admin: Support | `support@gyangrid.in` / `Support@1234` | Students, moderation and audit. |
+| Admin: Super Admin | `superadmin@gyaangrid.in` / `Admin@1234` | 2FA code `123456` |
+| Admin: Content Manager | `content@gyaangrid.in` / `Content@1234` | Can edit content. Config is read-only. |
+| Admin: Support | `support@gyaangrid.in` / `Support@1234` | Students, moderation and audit. |
 
 You can also sign up with any email to experience onboarding from scratch.
 
-Mock data is stored in `localStorage` (`gg:mockdb:v3`). To reset the demo, clear the site data or run `localStorage.clear()` in the browser console.
+Mock data is stored in `localStorage` (`gg:mockdb:v4`). To reset the demo, clear the site data or run `localStorage.clear()` in the browser console.
 
 ---
 
@@ -103,7 +103,7 @@ src/
 1. Copy `.env.example` to `.env` and set:
    ```
    VITE_USE_MOCK_API=false
-   VITE_API_BASE_URL=https://api.gyangrid.in/v1
+   VITE_API_BASE_URL=https://api.gyaangrid.in/v1
    ```
    With the mock disabled, the bundler drops the entire `services/mock` folder.
 2. The backend must return the common envelope `{ ok, data, error: { code, message } }` (PRD section 20). Error codes are listed in `src/services/errors.js`.

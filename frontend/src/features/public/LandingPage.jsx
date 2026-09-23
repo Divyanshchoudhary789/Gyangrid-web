@@ -29,7 +29,7 @@ const FEATURES = [
 ];
 
 const FAQ = [
-  ['Which classes and boards does GyanGrid cover?', 'Mathematics for Classes 6 to 10, following the NCERT / CBSE syllabus. More boards are on the way.'],
+  ['Which classes and boards does Gyaangrid cover?', 'Mathematics for Classes 6 to 10, following the NCERT / CBSE syllabus. More boards are on the way.'],
   ['Will the AI answer any question?', 'No — and that is on purpose. The tutor only helps with Mathematics from your class syllabus. It teaches step by step and always checks that you understood.'],
   ['Is my child’s data safe?', 'We collect the minimum: class, board and one parent contact. No date of birth, school or location. No ads, no tracking, and doubt conversations are never shared — not even in the parent report.'],
   ['What does the weekly parent report include?', 'Days active, challenges and tests completed, accuracy trend, strong and weak topics, mistakes fixed and rewards earned. It never includes chat content or answers.'],
@@ -211,7 +211,7 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="card p-6 sm:p-8">
-              <p className="text-xs font-semibold text-ink-400">Subject: GyanGrid — Aarav&apos;s week in Maths</p>
+              <p className="text-xs font-semibold text-ink-400">Subject: Gyaangrid — Aarav&apos;s week in Maths</p>
               <div className="mt-4 grid grid-cols-3 gap-3 text-center">
                 {[['5', 'active days'], ['71%', 'accuracy ↑6'], ['9', 'mistakes fixed']].map(([v, l]) => (
                   <div key={l} className="rounded-2xl bg-ink-50 p-3"><p className="font-display text-2xl font-bold text-ink-900">{v}</p><p className="text-xs text-ink-500">{l}</p></div>

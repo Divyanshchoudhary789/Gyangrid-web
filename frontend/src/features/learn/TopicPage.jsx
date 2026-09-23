@@ -52,7 +52,7 @@ function PdfViewer({ block, topicName }) {
         </div>
         <div className="max-h-[60vh] overflow-auto rounded-xl bg-ink-200 p-4" onContextMenu={(e) => e.preventDefault()}>
           <div className="mx-auto origin-top rounded-md bg-white p-8 shadow-lg" style={{ width: `${Math.round(560 * zoom)}px`, maxWidth: '100%', minHeight: 520 * zoom }}>
-            <p className="text-xs font-bold uppercase tracking-wider text-brand-600">GyanGrid practice sheet · page {page}</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-brand-600">Gyaangrid practice sheet · page {page}</p>
             <h3 className="mt-2 text-xl font-bold">{topicName}</h3>
             <div className="mt-6 space-y-5">
               {[1, 2, 3, 4].map((n) => (
@@ -62,7 +62,7 @@ function PdfViewer({ block, topicName }) {
                 </div>
               ))}
             </div>
-            <p className="mt-10 text-center text-xs text-ink-400">Licensed material · for personal study in GyanGrid only</p>
+            <p className="mt-10 text-center text-xs text-ink-400">Licensed material · for personal study in Gyaangrid only</p>
           </div>
         </div>
       </Modal>

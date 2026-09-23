@@ -14,9 +14,9 @@ const SU = 'SUPPORT';
 const nowIso = () => new Date().toISOString();
 
 export const ADMIN_ACCOUNTS = [
-  { email: 'superadmin@gyangrid.in', password: 'Admin@1234', name: 'Venkat (Owner)', role: SA },
-  { email: 'content@gyangrid.in', password: 'Content@1234', name: 'Priya — Content', role: CM },
-  { email: 'support@gyangrid.in', password: 'Support@1234', name: 'Rahul — Support', role: SU },
+  { email: 'superadmin@gyaangrid.in', password: 'Admin@1234', name: 'Venkat (Owner)', role: SA },
+  { email: 'content@gyaangrid.in', password: 'Content@1234', name: 'Priya — Content', role: CM },
+  { email: 'support@gyaangrid.in', password: 'Support@1234', name: 'Rahul — Support', role: SU },
 ];
 
 /** F12-11: every content, config, role and student-data action is audited with before/after. */

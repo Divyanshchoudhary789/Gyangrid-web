@@ -51,16 +51,16 @@ export default function LoginPage() {
     <AuthLayout
       title="Welcome back 👋"
       subtitle="Sign in to continue your streak."
-      footer={<>New to GyanGrid? <Link to="/signup" className="font-semibold text-brand-600 hover:underline">Create an account</Link></>}
+      footer={<>New to Gyaangrid? <Link to="/signup" className="font-semibold text-brand-600 hover:underline">Create an account</Link></>}
     >
       {env.useMockApi && (
         <div className="mb-6 flex items-start gap-3 rounded-2xl border border-brand-100 bg-brand-50 p-4 text-sm">
           <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-brand-500" aria-hidden />
           <div className="flex-1">
             <p className="font-semibold text-brand-900">Try the demo student</p>
-            <p className="mt-0.5 text-brand-800/80">demo@gyangrid.in · Demo@1234</p>
+            <p className="mt-0.5 text-brand-800/80">demo@gyaangrid.in · Demo@1234</p>
           </div>
-          <Button size="sm" variant="white" onClick={() => setForm({ email: 'demo@gyangrid.in', password: 'Demo@1234' })}>Fill in</Button>
+          <Button size="sm" variant="white" onClick={() => setForm({ email: 'demo@gyaangrid.in', password: 'Demo@1234' })}>Fill in</Button>
         </div>
       )}
       <GoogleSignIn />

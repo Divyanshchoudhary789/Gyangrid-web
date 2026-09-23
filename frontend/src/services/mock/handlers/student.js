@@ -246,7 +246,7 @@ function exportData({ uid, user }) {
   const st = userState(uid);
   return {
     exportedAt: new Date().toISOString(),
-    format: 'gyangrid-export-v1',
+    format: 'gyaangrid-export-v1',
     profile: publicUser(user),
     attempts: st.attempts,
     mistakes: Object.values(st.mistakes),
@@ -403,7 +403,7 @@ export function buildParentReport(uid, { weekEnd = today() } = {}) {
   const tests = Object.values(st.testAttempts).filter((a) => a.status === 'SUBMITTED' && inRange(istDateKey(new Date(a.submittedAt)), start, weekEnd));
   const fname = firstName(user.name);
   return {
-    subject: `GyanGrid — ${fname}'s week in Maths (${formatDate(`${start}T12:00:00+05:30`, { day: 'numeric', month: 'short' })} – ${formatDate(`${weekEnd}T12:00:00+05:30`, { day: 'numeric', month: 'short' })})`,
+    subject: `Gyaangrid — ${fname}'s week in Maths (${formatDate(`${start}T12:00:00+05:30`, { day: 'numeric', month: 'short' })} – ${formatDate(`${weekEnd}T12:00:00+05:30`, { day: 'numeric', month: 'short' })})`,
     recipientMasked: user.profile.parent?.contactMasked,
     parentName: user.profile.parent?.name,
     atAGlance: {

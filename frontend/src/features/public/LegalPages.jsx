@@ -49,8 +49,8 @@ export function PrivacyPage() {
 export function TermsPage() {
   return (
     <LegalShell title="Terms of use" updated="21 September 2026">
-      <section><h2>Using GyanGrid</h2><p>GyanGrid is for students in Classes 6–10. You need your parent or guardian&apos;s permission to use it.</p></section>
-      <section><h2>Be kind and honest</h2><p>Use GyanGrid to learn. Do not try to break the app, copy content or share your account.</p></section>
+      <section><h2>Using Gyaangrid</h2><p>Gyaangrid is for students in Classes 6–10. You need your parent or guardian&apos;s permission to use it.</p></section>
+      <section><h2>Be kind and honest</h2><p>Use Gyaangrid to learn. Do not try to break the app, copy content or share your account.</p></section>
       <section><h2>About the AI tutor</h2><p>The AI tutor only helps with Mathematics from your syllabus. It can make mistakes — if an answer looks wrong, please report it so we can fix it.</p></section>
       <section><h2>Gold Coins</h2><p>Coins are rewards for learning. They have no cash value. Ways to use them may be added later.</p></section>
     </LegalShell>

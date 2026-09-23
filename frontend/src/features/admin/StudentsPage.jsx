@@ -70,7 +70,7 @@ export default function StudentsPage() {
       const csv = [keys.join(','), ...rows.map((r) => keys.map((k) => `"${String(r[k] ?? '').replace(/"/g, '""')}"`).join(','))].join('\n');
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-      a.download = 'gyangrid-students-masked.csv';
+      a.download = 'gyaangrid-students-masked.csv';
       a.click();
       URL.revokeObjectURL(a.href);
       toast.success('Export downloaded and logged.');

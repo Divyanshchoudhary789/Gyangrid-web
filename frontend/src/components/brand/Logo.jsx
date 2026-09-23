@@ -23,11 +23,11 @@ export function LogoMark({ className }) {
 
 export function Logo({ to = '/', className, light, compact }) {
   return (
-    <Link to={to} className={cn('inline-flex items-center gap-2.5 rounded-xl', className)} aria-label="GyanGrid home">
+    <Link to={to} className={cn('inline-flex items-center gap-2.5 rounded-xl', className)} aria-label="Gyaangrid home">
       <LogoMark />
       {!compact && (
         <span className={cn('font-display text-xl font-bold tracking-tight', light ? 'text-white' : 'text-ink-900')}>
-          Gyan<span className={light ? 'text-gold-300' : 'text-brand-600'}>Grid</span>
+          Gyaan<span className={light ? 'text-gold-300' : 'text-brand-600'}>grid</span>
         </span>
       )}
     </Link>

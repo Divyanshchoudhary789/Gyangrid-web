@@ -24,7 +24,7 @@ export default function DashboardPage() {
     const blob = new Blob([toCsv(data.series)], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `gyangrid-daily-metrics-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `gyaangrid-daily-metrics-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
   };

@@ -78,7 +78,7 @@ export default function OnboardingPage() {
     const u = await save({ avatarId: chosen, complete: true });
     if (u?.onboarded) {
       track('signup_completed');
-      celebrate({ title: `Welcome to GyanGrid, ${firstName(u.name)}!`, emoji: '🎉' });
+      celebrate({ title: `Welcome to Gyaangrid, ${firstName(u.name)}!`, emoji: '🎉' });
       navigate('/home', { replace: true });
     }
   };
@@ -157,7 +157,7 @@ export default function OnboardingPage() {
               {step === 1 && (
                 <section>
                   <h1 className="text-2xl font-bold sm:text-3xl">Which board do you study?</h1>
-                  <p className="mt-2 text-ink-500">GyanGrid follows the NCERT textbooks chapter by chapter.</p>
+                  <p className="mt-2 text-ink-500">Gyaangrid follows the NCERT textbooks chapter by chapter.</p>
                   <div className="mt-6 grid gap-3 sm:grid-cols-3">
                     {BOARDS.map((b) => (
                       <ChoiceCard key={b.id} selected={boardId === b.id} disabled={!b.active} onClick={() => setBoardId(b.id)}>
@@ -194,7 +194,7 @@ export default function OnboardingPage() {
                 <section>
                   <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600"><ShieldCheck className="h-6 w-6" /></span>
                   <h1 className="mt-4 text-2xl font-bold sm:text-3xl">Before we start: your parent&apos;s permission</h1>
-                  <p className="mt-2 text-ink-500">Here is exactly what GyanGrid does with your information, in plain words.</p>
+                  <p className="mt-2 text-ink-500">Here is exactly what Gyaangrid does with your information, in plain words.</p>
                   <div className="mt-6 grid gap-3 sm:grid-cols-2">
                     {[
                       { icon: Eye, t: 'What we collect', d: 'Your name, class, board, one parent contact, and your answers, scores and mistakes.' },
@@ -212,12 +212,12 @@ export default function OnboardingPage() {
                     <Checkbox
                       checked={consent.selfDeclared}
                       onChange={(v) => setConsent({ ...consent, selfDeclared: v })}
-                      label={<span className="font-semibold text-ink-900">I confirm that my parent or guardian knows I am signing up for GyaanGrid and has given me permission to use it.</span>}
+                      label={<span className="font-semibold text-ink-900">I confirm that my parent or guardian knows I am signing up for Gyaangrid and has given me permission to use it.</span>}
                     />
                     <Checkbox
                       checked={consent.accepted}
                       onChange={(v) => setConsent({ ...consent, accepted: v })}
-                      label="I have read what GyanGrid collects and why, and I agree to the Privacy policy and Terms of use."
+                      label="I have read what Gyaangrid collects and why, and I agree to the Privacy policy and Terms of use."
                     />
                   </div>
                   <p className="mt-3 text-xs text-ink-400">Consent version {CONSENT_TEXT_VERSION}. We record the time and the method of this consent. {user?.profile?.parent?.contactMasked ? `A notice will be sent to ${user.profile.parent.contactMasked}.` : ''}</p>

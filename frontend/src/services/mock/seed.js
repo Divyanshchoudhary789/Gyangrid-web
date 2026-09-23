@@ -12,7 +12,7 @@ import { callDoubtSolver, refusal } from './ai';
 import { createUser, pwHash } from './handlers/student';
 import { gradeTest } from './handlers/assessment';
 
-export const DEMO_STUDENT = { email: 'demo@gyangrid.in', password: 'Demo@1234', name: 'Aarav Kumar' };
+export const DEMO_STUDENT = { email: 'demo@gyaangrid.in', password: 'Demo@1234', name: 'Aarav Kumar' };
 
 const at = (date, hh, mm) => `${date}T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00+05:30`;
 
@@ -177,26 +177,26 @@ function seedAdmin(d, demoUid) {
     };
   });
   d.admin.kbDocs = [
-    { id: 'kb_1', name: 'NCERT Class 8 Mathematics (2026-27).pdf', classId: 8, sizeKb: 14200, status: 'INDEXED', uploadedBy: 'content@gyangrid.in', uploadedAt: `${addDays(T, -30)}T11:00:00+05:30`, lastSyncAt: `${addDays(T, -2)}T02:00:00+05:30`, chunks: 2360 },
-    { id: 'kb_2', name: 'NCERT Class 9 Mathematics (2026-27).pdf', classId: 9, sizeKb: 16800, status: 'INDEXED', uploadedBy: 'content@gyangrid.in', uploadedAt: `${addDays(T, -30)}T11:05:00+05:30`, lastSyncAt: `${addDays(T, -2)}T02:00:00+05:30`, chunks: 2710 },
-    { id: 'kb_3', name: 'GyanGrid worked-solutions handbook — Algebra.docx', classId: null, sizeKb: 860, status: 'INDEXED', uploadedBy: 'content@gyangrid.in', uploadedAt: `${addDays(T, -12)}T15:20:00+05:30`, lastSyncAt: `${addDays(T, -12)}T15:24:00+05:30`, chunks: 140 },
-    { id: 'kb_4', name: 'Common misconceptions — Geometry (teacher notes).pdf', classId: null, sizeKb: 2100, status: 'FAILED', error: 'Scanned PDF without a text layer. Upload a searchable PDF.', uploadedBy: 'content@gyangrid.in', uploadedAt: `${addDays(T, -1)}T09:10:00+05:30`, lastSyncAt: null, chunks: 0 },
+    { id: 'kb_1', name: 'NCERT Class 8 Mathematics (2026-27).pdf', classId: 8, sizeKb: 14200, status: 'INDEXED', uploadedBy: 'content@gyaangrid.in', uploadedAt: `${addDays(T, -30)}T11:00:00+05:30`, lastSyncAt: `${addDays(T, -2)}T02:00:00+05:30`, chunks: 2360 },
+    { id: 'kb_2', name: 'NCERT Class 9 Mathematics (2026-27).pdf', classId: 9, sizeKb: 16800, status: 'INDEXED', uploadedBy: 'content@gyaangrid.in', uploadedAt: `${addDays(T, -30)}T11:05:00+05:30`, lastSyncAt: `${addDays(T, -2)}T02:00:00+05:30`, chunks: 2710 },
+    { id: 'kb_3', name: 'Gyaangrid worked-solutions handbook — Algebra.docx', classId: null, sizeKb: 860, status: 'INDEXED', uploadedBy: 'content@gyaangrid.in', uploadedAt: `${addDays(T, -12)}T15:20:00+05:30`, lastSyncAt: `${addDays(T, -12)}T15:24:00+05:30`, chunks: 140 },
+    { id: 'kb_4', name: 'Common misconceptions — Geometry (teacher notes).pdf', classId: null, sizeKb: 2100, status: 'FAILED', error: 'Scanned PDF without a text layer. Upload a searchable PDF.', uploadedBy: 'content@gyaangrid.in', uploadedAt: `${addDays(T, -1)}T09:10:00+05:30`, lastSyncAt: null, chunks: 0 },
   ];
   const q1 = CURRICULUM[8][2].topics[0].id;
   d.admin.moderation = [
     { id: 'mod_1', type: 'QUESTION_REPORT', status: 'OPEN', questionId: servable(q1)[3].questionId, reason: 'WRONG_ANSWER', note: 'I think the answer should be different', reportedBy: 'stu_1004', at: `${addDays(T, -1)}T18:40:00+05:30` },
     { id: 'mod_2', type: 'AI_ANSWER_REPORT', status: 'OPEN', doubtId: 'dbt_x91', reason: 'The steps skipped a part I did not understand', at: `${addDays(T, -1)}T21:05:00+05:30`, studentRef: 'stu_101…', topicName: 'Standard Identities', snapshot: { input: 'expand (2x+3)^2', concept: 'Algebraic identities and simplification', steps: ['Use (a + b)^2 = a^2 + 2ab + b^2', 'a = 2x, b = 3', '4x^2 + 12x + 9'] } },
     { id: 'mod_3', type: 'QUESTION_REPORT', status: 'OPEN', questionId: servable(CURRICULUM[8][6].topics[1].id)[8].questionId, reason: 'UNCLEAR', note: 'Not sure what GST means here', reportedBy: 'stu_1011', at: `${addDays(T, -2)}T17:12:00+05:30` },
-    { id: 'mod_4', type: 'AI_ANSWER_REPORT', status: 'RESOLVED', resolution: 'ANNOTATED_KB', doubtId: 'dbt_x55', reason: 'Used a formula we have not learnt', at: `${addDays(T, -5)}T20:00:00+05:30`, resolvedBy: 'support@gyangrid.in', resolvedAt: `${addDays(T, -4)}T10:00:00+05:30`, studentRef: 'stu_102…', topicName: 'Compound Interest' },
+    { id: 'mod_4', type: 'AI_ANSWER_REPORT', status: 'RESOLVED', resolution: 'ANNOTATED_KB', doubtId: 'dbt_x55', reason: 'Used a formula we have not learnt', at: `${addDays(T, -5)}T20:00:00+05:30`, resolvedBy: 'support@gyaangrid.in', resolvedAt: `${addDays(T, -4)}T10:00:00+05:30`, studentRef: 'stu_102…', topicName: 'Compound Interest' },
   ];
   d.admin.audit = [
-    { id: 'aud_s1', at: `${addDays(T, -1)}T10:15:00+05:30`, actor: 'Venkat (Owner) <superadmin@gyangrid.in>', role: 'SUPER_ADMIN', action: 'CONFIG_UPDATED', target: 'config v7', before: { version: 6 }, after: { version: 7, note: 'Coin value for Daily Challenge 8 → 10' } },
-    { id: 'aud_s2', at: `${addDays(T, -2)}T12:30:00+05:30`, actor: 'Priya — Content <content@gyangrid.in>', role: 'CONTENT_MANAGER', action: 'QUESTIONS_BULK_IMPORTED', target: '120 rows', before: null, after: { imported: 117, rejected: 3 } },
-    { id: 'aud_s3', at: `${addDays(T, -2)}T12:45:00+05:30`, actor: 'Priya — Content <content@gyangrid.in>', role: 'CONTENT_MANAGER', action: 'TEST_CREATED', target: 't_c8_full1', before: null, after: { status: 'PUBLISHED' } },
-    { id: 'aud_s4', at: `${addDays(T, -3)}T09:00:00+05:30`, actor: 'Rahul — Support <support@gyangrid.in>', role: 'SUPPORT', action: 'MODERATION_ANNOTATED_KB', target: 'mod_4', before: { status: 'OPEN' }, after: { status: 'RESOLVED' } },
-    { id: 'aud_s5', at: `${addDays(T, -6)}T16:20:00+05:30`, actor: 'Venkat (Owner) <superadmin@gyangrid.in>', role: 'SUPER_ADMIN', action: 'STUDENT_SUSPEND', target: 'stu_1007', before: { status: 'ACTIVE' }, after: { status: 'SUSPENDED' } },
+    { id: 'aud_s1', at: `${addDays(T, -1)}T10:15:00+05:30`, actor: 'Venkat (Owner) <superadmin@gyaangrid.in>', role: 'SUPER_ADMIN', action: 'CONFIG_UPDATED', target: 'config v7', before: { version: 6 }, after: { version: 7, note: 'Coin value for Daily Challenge 8 → 10' } },
+    { id: 'aud_s2', at: `${addDays(T, -2)}T12:30:00+05:30`, actor: 'Priya — Content <content@gyaangrid.in>', role: 'CONTENT_MANAGER', action: 'QUESTIONS_BULK_IMPORTED', target: '120 rows', before: null, after: { imported: 117, rejected: 3 } },
+    { id: 'aud_s3', at: `${addDays(T, -2)}T12:45:00+05:30`, actor: 'Priya — Content <content@gyaangrid.in>', role: 'CONTENT_MANAGER', action: 'TEST_CREATED', target: 't_c8_full1', before: null, after: { status: 'PUBLISHED' } },
+    { id: 'aud_s4', at: `${addDays(T, -3)}T09:00:00+05:30`, actor: 'Rahul — Support <support@gyaangrid.in>', role: 'SUPPORT', action: 'MODERATION_ANNOTATED_KB', target: 'mod_4', before: { status: 'OPEN' }, after: { status: 'RESOLVED' } },
+    { id: 'aud_s5', at: `${addDays(T, -6)}T16:20:00+05:30`, actor: 'Venkat (Owner) <superadmin@gyaangrid.in>', role: 'SUPER_ADMIN', action: 'STUDENT_SUSPEND', target: 'stu_1007', before: { status: 'ACTIVE' }, after: { status: 'SUSPENDED' } },
   ];
-  d.admin.configHistory = [{ version: 7, at: `${addDays(T, -1)}T10:15:00+05:30`, by: 'superadmin@gyangrid.in', note: 'Coin value for Daily Challenge 8 → 10', before: null }];
+  d.admin.configHistory = [{ version: 7, at: `${addDays(T, -1)}T10:15:00+05:30`, by: 'superadmin@gyaangrid.in', note: 'Coin value for Daily Challenge 8 → 10', before: null }];
   return demoUid;
 }
 

@@ -85,7 +85,7 @@ export function PublicFooter() {
           </ul>
         </div>
       </div>
-      <div className="border-t border-ink-100 py-5 text-center text-xs text-ink-400">© {new Date().getFullYear()} GyanGrid. Built with care for young learners in India.</div>
+      <div className="border-t border-ink-100 py-5 text-center text-xs text-ink-400">© {new Date().getFullYear()} Gyaangrid. Built with care for young learners in India.</div>
     </footer>
   );
 }

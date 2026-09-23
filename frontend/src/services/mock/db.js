@@ -6,7 +6,7 @@ import { DEFAULT_CONFIG } from './defaultConfig';
  * It lives in localStorage so the demo behaves like a real server across reloads.
  * Delete this folder once the real API is wired (VITE_USE_MOCK_API=false).
  */
-const KEY = 'mockdb:v3';
+const KEY = 'mockdb:v4'; // v4: demo accounts moved to the gyaangrid.in domain
 let db = null;
 let saveTimer = null;
 

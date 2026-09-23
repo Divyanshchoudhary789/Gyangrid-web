@@ -19,7 +19,7 @@ export class ErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     // Hook for crash reporting (NFR-10). Never send PII.
-    console.error('[GyanGrid] UI error', error, info?.componentStack);
+    console.error('[Gyaangrid] UI error', error, info?.componentStack);
   }
 
   render() {

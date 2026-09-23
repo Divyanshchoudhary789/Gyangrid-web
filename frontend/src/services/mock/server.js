@@ -34,7 +34,7 @@ function authenticate(route, token) {
   if (!user || user.deletedAt) throw new ApiError(ERROR_CODES.UNAUTHENTICATED, 'Please sign in again.', { status: 401 });
   if (user.suspended) throw new ApiError(ERROR_CODES.ACCOUNT_SUSPENDED, 'This account is suspended. Please contact support.', { status: 403 });
   if (route.consent && !user.profile?.consent) {
-    throw new ApiError(ERROR_CODES.CONSENT_REQUIRED, 'Parental consent is required before using GyanGrid.', { status: 403 });
+    throw new ApiError(ERROR_CODES.CONSENT_REQUIRED, 'Parental consent is required before using Gyaangrid.', { status: 403 });
   }
   return { uid, user };
 }

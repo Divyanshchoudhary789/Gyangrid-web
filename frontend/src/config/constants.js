@@ -1,5 +1,5 @@
-export const APP_NAME = 'GyanGrid';
-export const SUPPORT_EMAIL = 'support@gyangrid.in';
+export const APP_NAME = 'Gyaangrid';
+export const SUPPORT_EMAIL = 'support@gyaangrid.in';
 export const CONSENT_TEXT_VERSION = 'consent-v1.0-2026-09';
 
 export const CLASSES = [6, 7, 8, 9, 10];
@@ -54,6 +54,6 @@ export const ROLE_LABELS = {
 };
 
 export const AI_REFUSAL_MESSAGE =
-  'I can currently help you with Mathematics topics from your GyanGrid syllabus. Please ask me a Mathematics question related to your course.';
+  'I can currently help you with Mathematics topics from your Gyaangrid syllabus. Please ask me a Mathematics question related to your course.';
 
 export const DOUBT_LIMITS = { maxTextChars: 1000, maxImageMb: 5, maxVoiceSec: 60, imageLongEdgePx: 1600 };

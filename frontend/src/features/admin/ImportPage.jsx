@@ -51,7 +51,7 @@ export default function ImportPage() {
     const blob = new Blob([TEMPLATE], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'gyangrid-question-template.csv';
+    a.download = 'gyaangrid-question-template.csv';
     a.click();
     URL.revokeObjectURL(a.href);
   };

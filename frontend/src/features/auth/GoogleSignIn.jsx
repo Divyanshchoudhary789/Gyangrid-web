@@ -65,13 +65,13 @@ export function GoogleSignIn({ label = 'Continue with Google' }) {
   return (
     <>
       <Button variant="outline" size="lg" block leftIcon={GoogleG} onClick={start}>{label}</Button>
-      <Modal open={open} onClose={() => { setOpen(false); setCustom(false); }} title="Choose an account" description="to continue to GyanGrid" size="sm">
+      <Modal open={open} onClose={() => { setOpen(false); setCustom(false); }} title="Choose an account" description="to continue to Gyaangrid" size="sm">
         {!custom ? (
           <div className="space-y-2">
-            <button type="button" disabled={Boolean(busy)} onClick={() => signIn({ email: 'demo@gyangrid.in', name: 'Aarav Kumar' })} className="flex w-full items-center gap-3 rounded-2xl border border-ink-100 p-3 text-left transition hover:bg-ink-50">
+            <button type="button" disabled={Boolean(busy)} onClick={() => signIn({ email: 'demo@gyaangrid.in', name: 'Aarav Kumar' })} className="flex w-full items-center gap-3 rounded-2xl border border-ink-100 p-3 text-left transition hover:bg-ink-50">
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-xl">🦊</span>
-              <span className="min-w-0 flex-1"><span className="block font-semibold text-ink-900">Aarav Kumar</span><span className="block truncate text-sm text-ink-500">demo@gyangrid.in · demo student</span></span>
-              {busy === 'demo@gyangrid.in' && <span className="text-xs text-ink-400">Signing in…</span>}
+              <span className="min-w-0 flex-1"><span className="block font-semibold text-ink-900">Aarav Kumar</span><span className="block truncate text-sm text-ink-500">demo@gyaangrid.in · demo student</span></span>
+              {busy === 'demo@gyaangrid.in' && <span className="text-xs text-ink-400">Signing in…</span>}
             </button>
             <button type="button" onClick={() => setCustom(true)} className="flex w-full items-center gap-3 rounded-2xl border border-ink-100 p-3 text-left transition hover:bg-ink-50">
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-ink-100 text-ink-600"><UserPlus className="h-5 w-5" /></span>

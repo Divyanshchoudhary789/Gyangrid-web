@@ -35,7 +35,7 @@ export function questionsForTopic(topicId) {
         questionImageUrl: null,
         stats: { attempts, correct: Math.round(attempts * (difficulty === 'EASY' ? 0.78 : difficulty === 'MEDIUM' ? 0.58 : 0.39) * (0.85 + rng.next() * 0.3)), avgTimeSec: Math.round(TIME[difficulty] * (0.7 + rng.next() * 0.6)) },
         version: 1,
-        createdBy: 'content@gyangrid.in',
+        createdBy: 'content@gyaangrid.in',
         updatedAt: '2026-09-01T10:00:00.000Z',
         questionText: q.text,
         type: q.type,

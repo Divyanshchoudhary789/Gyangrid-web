@@ -67,7 +67,7 @@ export default function AdminLoginPage() {
               {env.useMockApi && (
                 <div className="rounded-xl bg-ink-50 p-3 text-xs text-ink-600">
                   <p className="mb-1 font-bold">Demo accounts (2FA code 123456)</p>
-                  {[['superadmin@gyangrid.in', 'Admin@1234', 'Super Admin'], ['content@gyangrid.in', 'Content@1234', 'Content Manager'], ['support@gyangrid.in', 'Support@1234', 'Support']].map(([e, p, r]) => (
+                  {[['superadmin@gyaangrid.in', 'Admin@1234', 'Super Admin'], ['content@gyaangrid.in', 'Content@1234', 'Content Manager'], ['support@gyaangrid.in', 'Support@1234', 'Support']].map(([e, p, r]) => (
                     <button key={e} type="button" onClick={() => setForm({ email: e, password: p })} className="block w-full rounded-lg px-2 py-1 text-left hover:bg-white">{r}: {e}</button>
                   ))}
                 </div>
