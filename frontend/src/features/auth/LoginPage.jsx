@@ -7,7 +7,6 @@ import { errorMessage } from '@/services/errors';
 import { isEmail } from '@/lib/validators';
 import { useDocumentTitle } from '@/hooks/useCommon';
 import { track } from '@/lib/analytics';
-import { env } from '@/config/env';
 import { AuthLayout, Divider } from './AuthLayout';
 import { GoogleSignIn } from './GoogleSignIn';
 import { startSession, homePathFor } from './session';
@@ -53,7 +52,7 @@ export default function LoginPage() {
       subtitle="Sign in to continue your streak."
       footer={<>New to Gyaangrid? <Link to="/signup" className="font-semibold text-brand-600 hover:underline">Create an account</Link></>}
     >
-      {env.useMockApi && (
+      {import.meta.env.VITE_USE_MOCK_API === 'true' && (
         <div className="mb-6 flex items-start gap-3 rounded-2xl border border-brand-100 bg-brand-50 p-4 text-sm">
           <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-brand-500" aria-hidden />
           <div className="flex-1">

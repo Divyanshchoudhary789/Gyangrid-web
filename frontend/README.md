@@ -5,9 +5,11 @@ The responsive web frontend for **Gyaangrid**, an AI-powered Mathematics tutor f
 It has two surfaces:
 
 - **Student web app**: onboarding with parental consent, Home, Learn, Practice, Daily Challenge, Tests & Test Series, AI Doubt Solver, Mistake Bank, Progress, Leaderboard, Rewards, Profile and Settings.
-- **Admin console** (`/admin`): role-gated with 2FA. Covers curriculum, study material, question bank with CSV import, test and series builder, AI knowledge base, remote config, students, moderation and the audit log.
+- **Admin console** (`/admin`): sign-in with TOTP 2FA, curriculum, study material with PDF upload, question bank with CSV import, test and series builder, AI knowledge base, remote config, students, moderation, analytics and the audit log.
 
-Everything currently runs against an **in-browser mock API** that follows the PRD's API contract and business rules. Switching to the real backend is a configuration change (see [Connecting the real backend](#connecting-the-real-backend)).
+The app runs against the **live Gyaangrid backend** (Express + MongoDB, Firebase Auth). Mock data is **off**. Backend go-live items are listed in [`docs/PENDING_BACKEND_APIS.md`](../docs/PENDING_BACKEND_APIS.md).
+
+An in-browser **mock API** (the original PRD reference implementation) is kept for demos. It is switched on with one env flag and is stripped from real builds (see [Modes](#modes-real-backend-vs-mock)).
 
 ---
 
@@ -16,14 +18,31 @@ Everything currently runs against an **in-browser mock API** that follows the PR
 ```bash
 cd frontend
 npm install
+cp .env.example .env # then fill in the values (ask the team lead; never commit .env)
 npm run dev          # http://localhost:5173
 ```
 
-Other scripts: `npm run build` (production build), `npm run preview` (serve the build), `npm run lint`.
+Other scripts: `npm run build` (production build), `npm run preview` (serve the build), `npm run lint`, `npm test` (adapter contract tests built from the Postman examples).
 
 Requires Node 18+ (tested on Node 22).
 
-### Demo accounts (mock mode)
+### Environment variables
+
+| Variable | Purpose |
+|---|---|
+| `VITE_USE_MOCK_API` | `false` (default) = live backend. `true` = in-browser mock for demos only. |
+| `VITE_API_BASE_URL` | Backend base URL including `/api/v1`, no trailing slash. |
+| `VITE_FIREBASE_*` | Firebase Web SDK config (Authentication only). |
+| `VITE_MOCK_LATENCY_MS` | Simulated latency, mock mode only. |
+
+`.env` is git-ignored. The Firebase **web** config is not a secret: it ships in every browser bundle, and access is protected by Firebase Auth plus backend token verification. Still, keep it in `.env` and set it in your hosting provider's environment settings rather than in code. In the Firebase console, restrict the API key to your production domains (HTTP referrers) and add the domains under *Authentication → Settings → Authorized domains*.
+
+### Modes: real backend vs mock
+
+- **Real (default):** sign up or sign in with email/password or Google (Firebase). The backend verifies the Firebase ID token on every call. Admins sign in at `/admin/login` with a Firebase account whose backend `role` is `admin`.
+- **Mock:** set `VITE_USE_MOCK_API=true` and restart `npm run dev`. The demo accounts below apply. Real builds never include the mock code or its demo accounts.
+
+### Demo accounts (mock mode only)
 
 | Surface | Login | Notes |
 |---|---|---|
@@ -66,12 +85,21 @@ src/
   hooks/                  useQuery (SWR cache + offline persistence), online status, server countdown…
   store/                  zustand stores (student session, admin session, celebrations)
   services/
-    http.js               the ONLY network entry point (real fetch or mock)
-    errors.js             stable error codes + ApiError
-    api/student.js        student API surface (section 20)
-    api/admin.js          admin API surface (/admin/*)
-    auth/googleProvider.js  integration point for Firebase Google sign-in
-    mock/                 in-browser mock backend (delete once the real API is live)
+    http.js               the ONLY network entry point (real fetch with token refresh/retry, or mock)
+    errors.js             stable error codes, backend errorCode mapping, ApiError
+    api/student.js        picks real/ or studentMock.js by VITE_USE_MOCK_API
+    api/admin.js          picks real/admin.js or adminMock.js
+    api/real/             live-backend adapters: backend shapes → UI shapes, capability flags
+      auth.js             Firebase sign-in + /auth/me + /profile
+      student.js          home, learn, challenge, practice, tests, mistakes, progress, rewards, account
+      admin.js            /admin/* adapter + `caps` (what the backend supports)
+      curriculum.js       memoised public curriculum lookups
+      questions.js        question/answer mapping (MCQ, TRUE_FALSE, SHORT_ANSWER)
+      doubts.js           AI tutor conversation, quota, media upload, transcription
+      uploads.js          direct PUT to signed storage URLs
+      contract.test.js    adapters tested against the saved Postman responses
+    auth/firebase.js      Firebase Auth (email/password, Google popup, reset, verification)
+    mock/                 in-browser mock backend (demo mode only)
       server.js           router + auth / consent / role guards
       engine.js           server-side rules: grading, mistakes, XP/coins ledgers, streaks, mastery, recommendations
       ai.js               mock AI service (scope classifier, doubt solver, explanations)
@@ -93,24 +121,28 @@ src/
 - **Consent gate (F1-07).** Content and AI routes return `403 CONSENT_REQUIRED` without a consent record. UI route guards only improve UX; they are not the security boundary.
 - **Class isolation (F3-01).** Requesting another class's content returns 403.
 - **Offline (F2-07, NFR-03).** Home, curriculum, topics (last 3 cached) and progress render from cache. Challenge answers queue locally and flush on reconnect. Test autosave retries. Every CTA shows an offline state.
-- **Safe rendering.** No raw HTML is ever injected. Study material uses a safe Markdown subset, and KaTeX runs with `trust: false`.
+- **Safe rendering.** Backend study material (HTML) is sanitised with DOMPurify through `components/math/SafeHtml.jsx` (allow-listed tags, https-only images, links open with `rel=noopener`). Mock material uses a safe Markdown subset. KaTeX runs with `trust: false`.
 - **Privacy (section 21).** No third-party analytics or ad SDKs. `lib/analytics.js` is a first-party event stub. Parent contact is masked everywhere. Doubt content never appears on parent-facing surfaces or in admin, unless it was flagged.
 
 ---
 
-## Connecting the real backend
+## Backend integration
 
-1. Copy `.env.example` to `.env` and set:
-   ```
-   VITE_USE_MOCK_API=false
-   VITE_API_BASE_URL=https://api.gyaangrid.in/v1
-   ```
-   With the mock disabled, the bundler drops the entire `services/mock` folder.
-2. The backend must return the common envelope `{ ok, data, error: { code, message } }` (PRD section 20). Error codes are listed in `src/services/errors.js`.
-3. Endpoints and payload shapes are defined in `src/services/api/student.js` and `src/services/api/admin.js`. The mock handlers in `src/services/mock/handlers/*` are the reference implementation of each response shape.
-4. **Auth.** Replace the token persistence in `store/authStore.js` with the Firebase Auth SDK session, and have `setTokenProvider` in `main.jsx` return `auth.currentUser.getIdToken()`. Implement `services/auth/googleProvider.js` with `signInWithPopup`.
-5. **Uploads and speech-to-text.** `DoubtsPage` and `VoiceDoubtInput` already request a signed URL before sending. Add the `PUT` of the blob to `uploadUrl` where the comments indicate.
-6. Once everything is live, delete `src/services/mock/`.
+- **Envelope:** `{ success, message, data }`; errors `{ success: false, message, errorCode }`, mapped to UI codes in `src/services/errors.js`.
+- **Auth:** Firebase owns the session (`services/auth/firebase.js`). `main.jsx` gives `http.js` a token provider that returns a fresh Firebase ID token. On `401`, the token is force-refreshed and the request retried once. `features/auth/AuthBootstrap.jsx` waits for Firebase to restore the session before route guards run.
+- **Render cold starts:** requests time out after 60 s (90 s for AI routes), and GETs retry once on network errors and 5xx gateway errors.
+- **Adapters:** pages consume UI shapes. `services/api/real/*` maps backend responses onto them, so a backend field rename is a one-line fix there.
+- **Capabilities:** `mistakeApi.capabilities` and `adminApi.caps` describe what the backend supports, so one set of pages serves both real and mock mode.
+- **Provider outages:** a `503` from AI, speech, storage or email becomes `SERVICE_UNAVAILABLE`. Screens show a calm message, keep the student's input, and never show the raw server text.
+- **Public parent report:** `/parent-report/view?token=…` is authorised only by the signed token from the email. No bearer token is sent.
+- **Answer reveal:** server-graded answers for the challenge and practice are cached per user in `localStorage` (`rv:*`), so a refresh keeps the feedback. Test sessions (`ts:*`) are cached so a refresh resumes the test. Both are cleared on sign-out.
+
+### Deploying
+
+`npm run build` outputs a static site in `dist/`. Host it on any static host (Vercel, Netlify, Firebase Hosting, S3 + CloudFront) with an SPA fallback to `index.html`, and set the `VITE_*` variables in the host's build environment. `vercel.json` (SPA rewrite, security headers, immutable asset caching) and `public/_redirects` (Netlify) are included. Then:
+
+1. Add the production domain to Firebase *Authorized domains*.
+2. Add it to the backend's CORS allow-list.
 
 ---
 
@@ -129,7 +161,7 @@ src/
 | F9 Progress and mastery | `features/progress/ProgressPage.jsx`: activity strip, trend with gaps, strengths framed as next steps, "how is this calculated" on every metric, mastery map |
 | F10 Gamification | Header stats, `RewardsPage`, `LeaderboardPage` (top 20 plus own row, tie-break rules), celebrations. Referrals stay behind a flag. |
 | F11 Parent report | `features/profile/ParentReportPage.jsx`: shows the student exactly what the report contains and excludes |
-| F12 Admin console | `features/admin/*`: role-gated nav and API, 2FA, audit on every change |
+| F12 Admin console | `features/admin/*`: admin-only access, TOTP 2FA (QR drawn on the device), audit log, moderation, knowledge base. The backend has one `admin` role, so finer roles appear only in mock mode. |
 
 ### Assumptions and open items
 

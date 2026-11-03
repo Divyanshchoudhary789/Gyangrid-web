@@ -11,6 +11,7 @@ import { Logo } from '@/components/brand/Logo';
 import { Avatar, PageSkeleton } from '@/components/ui';
 import { useHome } from '@/features/shared/useHome';
 import { signOut } from '@/features/auth/session';
+import { classLabel, boardLabel } from '@/features/shared/userDisplay';
 
 const PRIMARY = [
   { to: '/home', label: 'Home', icon: House },
@@ -70,7 +71,7 @@ function UserMenu({ user }) {
           >
             <div className="px-3 py-2.5">
               <p className="font-bold text-ink-900">{user?.name}</p>
-              <p className="text-xs text-ink-500">Class {user?.profile?.classId} · NCERT / CBSE</p>
+              <p className="text-xs text-ink-500">{classLabel(user)} · {boardLabel(user)}</p>
             </div>
             <div className="my-1 h-px bg-ink-100" />
             {[{ to: '/profile', label: 'My profile', icon: UserRound }, { to: '/settings', label: 'Settings', icon: Settings }].map((i) => (
@@ -133,7 +134,7 @@ export function StudentLayout() {
           <Avatar id={user?.profile?.avatarId} />
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-ink-900">{user?.name}</p>
-            <p className="text-xs text-ink-500">Class {user?.profile?.classId} · Level {summary?.level ?? '–'}</p>
+            <p className="text-xs text-ink-500">{classLabel(user)} · Level {summary?.level ?? '–'}</p>
           </div>
         </Link>
       </aside>

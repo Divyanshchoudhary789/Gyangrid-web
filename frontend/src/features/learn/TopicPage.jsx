@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { FileText, PlayCircle, Target, MessageCircleQuestion, NotebookPen, ChevronLeft, ChevronRight, CheckCircle2, Clock, Lock, Minus, Plus, X } from 'lucide-react';
+import { FileText, PlayCircle, Target, MessageCircleQuestion, NotebookPen, ChevronLeft, ChevronRight, CheckCircle2, Clock, Lock, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader, Card, Button, ProgressRing, masteryColor, PageSkeleton, ErrorState, Badge, Modal, EmptyState } from '@/components/ui';
 import { RichText } from '@/components/math/RichText';
+import { SafeHtml } from '@/components/math/SafeHtml';
 import { useQuery, invalidate } from '@/hooks/useQuery';
-import { learnApi } from '@/services/api/student';
+import { learnApi, doubtApi } from '@/services/api/student';
 import { useDocumentTitle } from '@/hooks/useCommon';
-import { masteryBand } from '@/lib/format';
+import { masteryBand, plural } from '@/lib/format';
 import { humanDuration } from '@/lib/date';
 import { storage } from '@/lib/storage';
 import { track } from '@/lib/analytics';
@@ -24,71 +25,78 @@ function rememberTopic(topicId) {
   storage.set('recentTopics', recent.slice(0, 3));
 }
 
-/** In-app PDF viewer. Download and external sharing are disabled by default (F3-06). */
+const isHttpUrl = (u) => /^https:\/\//i.test(String(u || ''));
+
+/**
+ * In-app PDF viewer (F3-06). The browser's toolbar is hidden and the context menu disabled; true
+ * download protection needs short-lived signed URLs from the server.
+ */
 function PdfViewer({ block, topicName }) {
   const [open, setOpen] = useState(false);
-  const [page, setPage] = useState(1);
-  const [zoom, setZoom] = useState(1);
+  const usable = isHttpUrl(block.url);
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="card card-hover flex w-full items-center gap-4 p-4 text-left">
+      <button type="button" onClick={() => setOpen(true)} disabled={!usable} className="card card-hover flex w-full items-center gap-4 p-4 text-left disabled:cursor-not-allowed disabled:opacity-60">
         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-600"><FileText className="h-6 w-6" /></span>
-        <span className="min-w-0 flex-1"><span className="block truncate font-bold text-ink-900">{block.title}</span><span className="text-sm text-ink-500">{block.pages} pages · opens in the viewer</span></span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-bold text-ink-900">{block.title}</span>
+          <span className="text-sm text-ink-500">{usable ? `${block.pages ? `${block.pages} pages · ` : ''}opens in the viewer` : 'This PDF is not available right now'}</span>
+        </span>
         <ChevronRight className="h-5 w-5 text-ink-300" />
       </button>
-      <Modal open={open} onClose={() => setOpen(false)} title={block.title} size="xl">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-ink-100 p-2">
-          <div className="flex items-center gap-1">
-            <Button size="sm" variant="ghost" leftIcon={ChevronLeft} disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Prev</Button>
-            <span className="px-2 text-sm font-semibold text-ink-600">Page {page} / {block.pages}</span>
-            <Button size="sm" variant="ghost" rightIcon={ChevronRight} disabled={page >= block.pages} onClick={() => setPage((p) => p + 1)}>Next</Button>
-          </div>
-          <div className="flex items-center gap-1">
-            <Button size="sm" variant="ghost" onClick={() => setZoom((z) => Math.max(0.8, z - 0.1))} aria-label="Zoom out"><Minus className="h-4 w-4" /></Button>
-            <span className="w-12 text-center text-sm font-semibold text-ink-600">{Math.round(zoom * 100)}%</span>
-            <Button size="sm" variant="ghost" onClick={() => setZoom((z) => Math.min(1.6, z + 0.1))} aria-label="Zoom in"><Plus className="h-4 w-4" /></Button>
-            <span className="ml-2 hidden items-center gap-1 text-xs text-ink-500 sm:flex"><Lock className="h-3.5 w-3.5" /> Download disabled</span>
-          </div>
+      <Modal open={open} onClose={() => setOpen(false)} title={block.title} description={topicName} size="xl">
+        <div className="relative h-[70vh] overflow-hidden rounded-xl bg-ink-100" onContextMenu={(e) => e.preventDefault()}>
+          <iframe title={block.title} src={`${block.url}#toolbar=0&navpanes=0`} className="absolute inset-0 h-full w-full" referrerPolicy="no-referrer" />
         </div>
-        <div className="max-h-[60vh] overflow-auto rounded-xl bg-ink-200 p-4" onContextMenu={(e) => e.preventDefault()}>
-          <div className="mx-auto origin-top rounded-md bg-white p-8 shadow-lg" style={{ width: `${Math.round(560 * zoom)}px`, maxWidth: '100%', minHeight: 520 * zoom }}>
-            <p className="text-xs font-bold uppercase tracking-wider text-brand-600">Gyaangrid practice sheet · page {page}</p>
-            <h3 className="mt-2 text-xl font-bold">{topicName}</h3>
-            <div className="mt-6 space-y-5">
-              {[1, 2, 3, 4].map((n) => (
-                <div key={n}>
-                  <p className="font-semibold text-ink-800">Q{(page - 1) * 4 + n}.</p>
-                  <div className="mt-2 h-2.5 w-11/12 rounded bg-ink-100" /><div className="mt-2 h-2.5 w-3/4 rounded bg-ink-100" />
-                </div>
-              ))}
-            </div>
-            <p className="mt-10 text-center text-xs text-ink-400">Licensed material · for personal study in Gyaangrid only</p>
-          </div>
-        </div>
+        <p className="mt-2 flex items-center gap-1 text-xs text-ink-500"><Lock className="h-3.5 w-3.5" />Licensed material · for personal study in Gyaangrid only</p>
       </Modal>
     </>
   );
 }
 
+/** YouTube / Vimeo URL → privacy-friendly embed URL (no third-party tracking cookies for YouTube). */
+function toEmbedUrl(url) {
+  if (!isHttpUrl(url)) return null;
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./, '');
+    if (host === 'youtu.be') return `https://www.youtube-nocookie.com/embed/${u.pathname.slice(1)}?rel=0&modestbranding=1`;
+    if (host.endsWith('youtube.com')) {
+      const id = u.searchParams.get('v') || u.pathname.split('/').filter(Boolean).pop();
+      return id ? `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1` : null;
+    }
+    if (host === 'vimeo.com') return `https://player.vimeo.com/video/${u.pathname.split('/').filter(Boolean)[0]}`;
+    if (host === 'player.vimeo.com') return url;
+  } catch { /* invalid URL */ }
+  return null;
+}
+
 function VideoBlock({ block }) {
   const [playing, setPlaying] = useState(false);
-  const isEmbeddable = /^https:\/\/(www\.)?(youtube\.com|youtu\.be|player\.vimeo\.com)\//.test(block.url);
-  const embedUrl = isEmbeddable ? block.url.replace('watch?v=', 'embed/').replace('youtu.be/', 'www.youtube-nocookie.com/embed/').replace('www.youtube.com', 'www.youtube-nocookie.com') : null;
+  const embedUrl = toEmbedUrl(block.url);
+  const directVideo = !embedUrl && isHttpUrl(block.url) && /\.(mp4|webm|ogg)(\?|$)/i.test(block.url);
+  const playable = Boolean(embedUrl || directVideo);
   return (
     <div className="card overflow-hidden p-0">
       <div className="relative aspect-video bg-gradient-to-br from-ink-800 to-brand-900">
-        {playing && embedUrl ? (
-          <iframe title={block.title} src={`${embedUrl}?rel=0&modestbranding=1`} className="absolute inset-0 h-full w-full" allow="encrypted-media; picture-in-picture" allowFullScreen sandbox="allow-scripts allow-same-origin allow-presentation" />
-        ) : (
-          <button type="button" onClick={() => { setPlaying(true); if (!embedUrl) toast.info('Demo mode: the admin-attached video link will stream here.'); }} className="group absolute inset-0 flex flex-col items-center justify-center text-white">
+        {playing && embedUrl && (
+          <iframe title={block.title} src={embedUrl} className="absolute inset-0 h-full w-full" allow="encrypted-media; picture-in-picture; fullscreen" allowFullScreen sandbox="allow-scripts allow-same-origin allow-presentation" />
+        )}
+        {playing && directVideo && (
+          <video src={block.url} controls controlsList="nodownload" className="absolute inset-0 h-full w-full bg-black" onContextMenu={(e) => e.preventDefault()}>
+            <track kind="captions" />
+          </video>
+        )}
+        {!playing && (
+          <button type="button" disabled={!playable} onClick={() => setPlaying(true)} className="group absolute inset-0 flex flex-col items-center justify-center text-white disabled:cursor-not-allowed">
             <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white/15 backdrop-blur transition group-hover:scale-110 group-hover:bg-white/25"><PlayCircle className="h-10 w-10" /></span>
-            <span className="mt-3 font-semibold">{playing ? 'Video preview unavailable in demo' : 'Play video lesson'}</span>
+            <span className="mt-3 font-semibold">{playable ? 'Play video lesson' : 'Video not available right now'}</span>
           </button>
         )}
       </div>
       <div className="flex items-center justify-between p-4">
         <p className="font-bold text-ink-900">{block.title}</p>
-        {block.durationSec && <span className="flex items-center gap-1 text-sm text-ink-500"><Clock className="h-4 w-4" />{humanDuration(block.durationSec)}</span>}
+        {block.durationSec ? <span className="flex items-center gap-1 text-sm text-ink-500"><Clock className="h-4 w-4" />{humanDuration(block.durationSec)}</span> : null}
       </div>
     </div>
   );
@@ -150,8 +158,14 @@ export default function TopicPage() {
           {material ? (
             <>
               {text && <Card className="sm:p-8"><RichText source={text.body} /></Card>}
-              {video && <VideoBlock block={video} />}
-              {pdf && <PdfViewer block={pdf} topicName={topic.name} />}
+              {material.blocks.filter((b) => b.type === 'HTML').map((b) => (
+                <Card key={b.id} className="sm:p-8">
+                  {b.title && <h2 className="mb-4 text-xl font-bold">{b.title}</h2>}
+                  <SafeHtml html={b.html} />
+                </Card>
+              ))}
+              {material.blocks.filter((b) => b.type === 'VIDEO' && (b === video || b.id)).map((b, i) => <VideoBlock key={b.id || `v${i}`} block={b} />)}
+              {material.blocks.filter((b) => b.type === 'PDF' && (b === pdf || b.id)).map((b, i) => <PdfViewer key={b.id || `p${i}`} block={b} topicName={topic.name} />)}
             </>
           ) : (
             <EmptyState emoji="📝" title="Notes are on the way" description="Our teachers are still writing the notes for this topic. You can already practise it or ask a doubt." />
@@ -192,7 +206,7 @@ export default function TopicPage() {
             </div>
           </Card>
           <Button block size="lg" leftIcon={Target} onClick={() => setPractice(true)}>Practise this topic</Button>
-          <Button block size="lg" variant="outline" leftIcon={MessageCircleQuestion} onClick={() => navigate(`/doubts?mode=text&topic=${encodeURIComponent(topic.name)}`)}>Ask a doubt on this topic</Button>
+          {doubtApi.available !== false && <Button block size="lg" variant="outline" leftIcon={MessageCircleQuestion} onClick={() => navigate(`/doubts?mode=text&topic=${encodeURIComponent(topic.name)}`)}>Ask a doubt on this topic</Button>}
           {data.activeMistakes > 0 && (
             <Link to={`/mistakes?topicId=${topic.id}&status=ACTIVE`} className="card card-hover flex items-center gap-3 p-4">
               <NotebookPen className="h-5 w-5 text-rose-500" />
@@ -200,7 +214,7 @@ export default function TopicPage() {
               <Badge tone="danger">Review</Badge>
             </Link>
           )}
-          <p className="text-center text-xs text-ink-400">{data.questionCount} questions available in this topic</p>
+          {data.questionCount != null && <p className="text-center text-xs text-ink-400">{plural(data.questionCount, 'question')} available in this topic</p>}
         </aside>
       </div>
       <PracticeSetupModal open={practice} onClose={() => setPractice(false)} scope="TOPIC" targetId={topic.id} title={topic.name} />

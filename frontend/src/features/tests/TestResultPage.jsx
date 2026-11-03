@@ -66,19 +66,25 @@ export default function TestResultPage() {
             <span className="chip bg-rose-100 text-rose-700"><XCircle className="h-3.5 w-3.5" />{r.incorrect} wrong</span>
             <span className="chip bg-ink-100 text-ink-700"><MinusCircle className="h-3.5 w-3.5" />{r.skipped} skipped</span>
             {r.xpAwarded > 0 && <span className="chip bg-brand-100 text-brand-700">+{r.xpAwarded} XP</span>}
+            {r.passed != null && <span className={cn('chip', r.passed ? 'bg-emerald-600 text-white' : 'bg-amber-100 text-amber-800')}>{r.passed ? 'Passed' : `Pass mark: ${r.passingMarks ?? '—'}`}</span>}
           </div>
           {r.negativeMarks > 0 && <p className="mt-3 text-xs text-ink-500">Marks = ({r.correct} × {r.marksPerQ}) − ({r.incorrect} × {r.negativeMarks}){r.marks === 0 ? ', floored at 0' : ''}</p>}
           {!r.isFirstAttempt && <p className="mt-2 text-xs text-ink-500">Re-attempt: your first attempt is the one that counts for rankings.</p>}
         </div>
       </Card>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className={cn('grid grid-cols-2 gap-3', r.rankAvailable !== false && 'lg:grid-cols-4')}>
         <Stat icon={Target} label="Accuracy" value={`${r.accuracy}%`} hint="of answered questions" />
-        <Stat icon={Clock} tone="info" label="Time taken" value={humanDuration(r.timeTakenSec)} hint={`of ${humanDuration(r.durationSec)}`} />
-        <Stat icon={Trophy} tone="gold" label="Rank" value={r.rank ? `#${r.rank.rank}` : '—'} hint={r.rank ? `of ${r.rank.of} students` : 'Not enough attempts yet'} />
-        <Stat icon={Users} tone="success" label="Percentile" value={r.rank ? `${r.rank.percentile}` : '—'} hint={r.rank ? 'better than this % of class' : 'Needs 10+ attempts'} />
+        <Stat icon={Clock} tone="info" label="Time taken" value={r.timeTakenSec != null ? humanDuration(r.timeTakenSec) : '—'} hint={r.durationSec ? `of ${humanDuration(r.durationSec)}` : null} />
+        {r.rankAvailable !== false && (
+          <>
+            <Stat icon={Trophy} tone="gold" label="Rank" value={r.rank ? `#${r.rank.rank}` : '—'} hint={r.rank ? `of ${r.rank.of} students` : 'Not enough attempts yet'} />
+            <Stat icon={Users} tone="success" label="Percentile" value={r.rank ? `${r.rank.percentile}` : '—'} hint={r.rank ? 'better than this % of class' : 'Needs 10+ attempts'} />
+          </>
+        )}
       </div>
 
+      {r.aiSummary && (
       <Card className="border-brand-100 bg-gradient-to-br from-brand-50 to-white">
         <p className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-brand-600"><Sparkles className="h-4 w-4" /> AI summary</p>
         <ul className="mt-3 space-y-1.5 text-[15px] text-ink-800">{r.aiSummary.lines.map((l) => <li key={l}>• {l}</li>)}</ul>
@@ -87,7 +93,9 @@ export default function TestResultPage() {
           {r.weakestTopicId && <Button size="sm" rightIcon={ArrowRight} onClick={practise}>Start practice</Button>}
         </div>
       </Card>
+      )}
 
+      {(r.byChapter.length > 0 || r.byTopic.length > 0) && (
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <h2 className="section-title mb-4">Chapter-wise</h2>
@@ -112,11 +120,13 @@ export default function TestResultPage() {
           </ul>
         </Card>
       </div>
-
-      {r.mistakesSaved > 0 && (
-        <Alert tone="info" title={`${r.mistakesSaved} wrong answer${r.mistakesSaved > 1 ? 's' : ''} saved to your Mistake Bank`} action={<Button size="sm" variant="outline" leftIcon={NotebookPen} to="/mistakes?source=TEST">Review</Button>}>They will resurface in 3 days until you fix them.</Alert>
       )}
 
+      {r.mistakesSaved > 0 && (
+        <Alert tone="info" title={`${r.mistakesSaved} wrong answer${r.mistakesSaved > 1 ? 's' : ''} saved to your Mistake Bank`} action={<Button size="sm" variant="outline" leftIcon={NotebookPen} to="/mistakes?source=TEST">Review</Button>}>Open your Mistake Bank to see the worked solutions.</Alert>
+      )}
+
+      {r.questions.length > 0 && (
       <Card>
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="section-title">Solutions</h2>
@@ -149,6 +159,7 @@ export default function TestResultPage() {
           </div>
         )}
       </Card>
+      )}
       <div className="grid gap-2 sm:grid-cols-2">
         <Button variant="outline" to="/tests" leftIcon={Award}>More tests</Button>
         <Button to="/home">Back to Home</Button>

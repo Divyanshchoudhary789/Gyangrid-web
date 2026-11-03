@@ -46,7 +46,10 @@ export function timeAgo(input) {
 }
 
 export function formatDate(input, opts = { day: 'numeric', month: 'short', year: 'numeric' }) {
-  return new Intl.DateTimeFormat('en-IN', { timeZone: IST_TZ, ...opts }).format(new Date(input));
+  const d = new Date(input);
+  // One malformed date from an API must never take a whole screen down.
+  if (Number.isNaN(d.getTime())) return '—';
+  return new Intl.DateTimeFormat('en-IN', { timeZone: IST_TZ, ...opts }).format(d);
 }
 
 export function formatDateTime(input) {

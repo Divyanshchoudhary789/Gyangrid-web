@@ -7,18 +7,19 @@ import { useQuery } from '@/hooks/useQuery';
 import { adminApi } from '@/services/api/admin';
 import { errorMessage } from '@/services/errors';
 import { useDocumentTitle } from '@/hooks/useCommon';
+import { ComingSoon } from '@/components/feedback/ComingSoon';
 import { formatDateTime } from '@/lib/date';
-import { AdminPageHeader } from './adminShared';
+import { AdminPageHeader, supports, ADMIN_CAPS } from './adminShared';
 
 const TYPE = {
   QUESTION_REPORT: { label: 'Reported question', icon: Flag, tone: 'warning' },
   AI_ANSWER_REPORT: { label: 'Flagged AI answer', icon: Bot, tone: 'info' },
   SAFETY_FLAG: { label: 'Safety flag', icon: ShieldAlert, tone: 'danger' },
 };
-const REASONS = { WRONG_ANSWER: 'Answer seems wrong', UNCLEAR: 'Question unclear', NOT_IN_SYLLABUS: 'Not in syllabus' };
+const REASONS = { WRONG_ANSWER: 'Answer seems wrong', INCORRECT_ANSWER: 'Answer seems wrong', UNCLEAR: 'Unclear', NOT_IN_SYLLABUS: 'Not in syllabus', OTHER: 'Other' };
 
 /** Moderation queue (F12-09). Doubt content is visible here only because the student or safety filter flagged it (F12-12). */
-export default function ModerationPage() {
+function ModerationPageFull() {
   useDocumentTitle('Moderation');
   const [status, setStatus] = useState('OPEN');
   const { data, error, loading, refetch } = useQuery(`admin:moderation:${status}`, () => adminApi.moderation(status), { staleMs: 0 });
@@ -40,7 +41,7 @@ export default function ModerationPage() {
   return (
     <div>
       <AdminPageHeader title="Moderation queue" subtitle="Reported questions and flagged AI answers, with minimum personal data." />
-      <Tabs className="mb-5" value={status} onChange={setStatus} tabs={[{ value: 'OPEN', label: 'Open' }, { value: 'RESOLVED', label: 'Resolved' }]} />
+      <Tabs className="mb-5" value={status} onChange={setStatus} tabs={[{ value: 'OPEN', label: 'Open' }, { value: 'RESOLVED', label: 'Resolved' }, ...(ADMIN_CAPS ? [{ value: 'DISMISSED', label: 'Dismissed' }] : [])]} />
       {loading && !data ? <PageSkeleton rows={1} /> : !data ? <ErrorState error={error} onRetry={refetch} /> : data.items.length === 0 ? (
         <EmptyState emoji="🧹" title="All clear" description="Nothing is waiting for review." />
       ) : (
@@ -57,7 +58,7 @@ export default function ModerationPage() {
                   </div>
                   <span className="text-xs text-ink-400">{formatDateTime(m.at)}{m.studentRef ? ` · ${m.studentRef}` : ''}</span>
                 </div>
-                {m.question && <div className="mt-3 rounded-xl bg-ink-50 p-3 text-sm"><p className="mb-1 font-mono text-xs text-ink-400">{m.questionId}</p><MathText text={m.question.text} /></div>}
+                {m.question && <div className="mt-3 rounded-xl bg-ink-50 p-3 text-sm">{!ADMIN_CAPS && <p className="mb-1 font-mono text-xs text-ink-400">{m.questionId}</p>}<MathText text={m.question.text} /></div>}
                 {m.snapshot && (
                   <div className="mt-3 space-y-1 rounded-xl bg-ink-50 p-3 text-sm">
                     <p><strong>Student asked:</strong> {m.snapshot.input}</p>
@@ -68,8 +69,8 @@ export default function ModerationPage() {
                 {m.note && <p className="mt-2 text-sm text-ink-600">“{m.note}”</p>}
                 {m.type === 'SAFETY_FLAG' && <p className="mt-2 text-sm text-rose-700">The student received the safe, trusted-adult response. Content is not shown to protect the student; escalate per the safeguarding process.</p>}
                 <div className="mt-4 flex items-center justify-between gap-3">
-                  {m.status === 'RESOLVED' ? (
-                    <p className="flex items-center gap-1.5 text-sm text-emerald-700"><CheckCircle2 className="h-4 w-4" />{m.resolution?.replace(/_/g, ' ').toLowerCase()} by {m.resolvedBy}</p>
+                  {m.status !== 'OPEN' ? (
+                    <p className="flex items-center gap-1.5 text-sm text-emerald-700"><CheckCircle2 className="h-4 w-4" />{(m.resolution || m.status).replace(/_/g, ' ').toLowerCase()}{m.resolvedBy ? ` by ${m.resolvedBy}` : ''}{m.resolutionNote ? ` · ${m.resolutionNote}` : ''}</p>
                   ) : <span />}
                   {m.status === 'OPEN' && <Button size="sm" onClick={() => setResolving(m)}>Review</Button>}
                 </div>
@@ -83,11 +84,18 @@ export default function ModerationPage() {
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
           <Button variant="success" loading={busy} onClick={() => resolve('CORRECTED')}>Mark corrected</Button>
           {resolving?.questionId && <Button variant="danger" loading={busy} onClick={() => resolve('RETIRED_QUESTION')}>Retire question</Button>}
-          {resolving?.type !== 'QUESTION_REPORT' && <Button variant="secondary" loading={busy} onClick={() => resolve('ANNOTATED_KB')}>Annotate knowledge base</Button>}
-          {resolving?.type === 'SAFETY_FLAG' && <Button variant="danger" loading={busy} onClick={() => resolve('ESCALATED')}>Escalate</Button>}
+          {resolving?.type !== 'QUESTION_REPORT' && !ADMIN_CAPS && <Button variant="secondary" loading={busy} onClick={() => resolve('ANNOTATED_KB')}>Annotate knowledge base</Button>}
+          {(ADMIN_CAPS || resolving?.type === 'SAFETY_FLAG') && <Button variant="secondary" loading={busy} onClick={() => resolve('ESCALATED')}>Escalate</Button>}
           <Button variant="outline" loading={busy} onClick={() => resolve('DISMISSED')}>Dismiss</Button>
         </div>
       </Modal>
     </div>
   );
+}
+
+export default function ModerationPage() {
+  if (!supports('moderation')) {
+    return <ComingSoon title="Moderation queue" subtitle="The backend has no reported-question or flagged-answer endpoints yet." emoji="🛡️" points={['Reported questions', 'Flagged AI answers', 'Safety flags', 'Resolve with audit trail']} primary={{ to: '/admin', label: 'Back to dashboard' }} />;
+  }
+  return <ModerationPageFull />;
 }

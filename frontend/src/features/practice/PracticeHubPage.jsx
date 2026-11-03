@@ -7,7 +7,7 @@ import { learnApi } from '@/services/api/student';
 import { useHome } from '@/features/shared/useHome';
 import { useDocumentTitle } from '@/hooks/useCommon';
 import { useAuthStore } from '@/store/authStore';
-import { masteryBand } from '@/lib/format';
+import { masteryBand, plural } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { PracticeSetupModal } from './PracticeSetupModal';
 
@@ -71,7 +71,7 @@ export default function PracticeHubPage() {
               <Card key={c.id} padded={false} className="overflow-hidden">
                 <button type="button" onClick={() => setOpen(expanded ? null : c.id)} className="flex w-full items-center gap-4 p-4 text-left sm:px-5" aria-expanded={expanded}>
                   <ProgressRing value={c.mastery ?? 0} size={44} stroke={5} tone={masteryColor(c.mastery)}><span className="text-xs font-bold">{c.number}</span></ProgressRing>
-                  <span className="min-w-0 flex-1"><span className="block truncate font-bold text-ink-900">{c.name}</span><span className="text-xs text-ink-500">{c.topicCount} topics · {c.questionCount} questions</span></span>
+                  <span className="min-w-0 flex-1"><span className="block truncate font-bold text-ink-900">{c.name}</span><span className="text-xs text-ink-500">{plural(c.topicCount, 'topic')}{c.questionCount != null ? ` · ${plural(c.questionCount, 'question')}` : ''}</span></span>
                   <ChevronDown className={cn('h-5 w-5 text-ink-400 transition', expanded && 'rotate-180')} />
                 </button>
                 {expanded && (
@@ -82,7 +82,7 @@ export default function PracticeHubPage() {
                         const b = masteryBand(t.mastery);
                         return (
                           <button key={t.id} type="button" onClick={() => setSetup({ scope: 'TOPIC', targetId: t.id, title: t.name })} className="flex items-center gap-3 rounded-xl border border-ink-100 bg-white p-3 text-left transition hover:border-brand-200 hover:shadow-card">
-                            <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-ink-900">{t.name}</span><span className="text-xs text-ink-500">{t.questionCount} questions</span></span>
+                            <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-ink-900">{t.name}</span>{t.questionCount != null && <span className="text-xs text-ink-500">{plural(t.questionCount, 'question')}</span>}</span>
                             <Badge tone={b.tone}>{t.mastery ?? '—'}</Badge>
                           </button>
                         );

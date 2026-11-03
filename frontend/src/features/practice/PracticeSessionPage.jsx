@@ -7,7 +7,7 @@ import { Button, Card, ProgressBar, PageSkeleton, ErrorState, Badge } from '@/co
 import { QuestionView, SolutionPanel, ReportQuestionButton } from '@/components/question/QuestionView';
 import { DiagnosisList } from '@/features/challenge/Diagnosis';
 import { useQuery } from '@/hooks/useQuery';
-import { practiceApi } from '@/services/api/student';
+import { practiceApi, doubtApi } from '@/services/api/student';
 import { errorMessage } from '@/services/errors';
 import { useDocumentTitle, useElapsed, useOnline } from '@/hooks/useCommon';
 import { useCelebrationStore } from '@/store/celebrationStore';
@@ -116,7 +116,7 @@ export default function PracticeSessionPage() {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Badge tone="success" icon={Check}>{correct}</Badge>
-          <Badge tone="brand" icon={Zap}>+{xpTotal} XP</Badge>
+          {xpTotal > 0 && <Badge tone="brand" icon={Zap}>+{xpTotal} XP</Badge>}
         </div>
       </div>
       <div className="mb-2 flex justify-between text-xs font-semibold text-ink-500"><span>Question {index + 1} of {data.questions.length}</span><span>{answered} answered</span></div>
@@ -138,7 +138,7 @@ export default function PracticeSessionPage() {
             {revealed && <SolutionPanel result={revealed} />}
             <div className="mt-6 flex flex-col-reverse gap-3 border-t border-ink-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-1">
-                <Button variant="ghost" size="sm" leftIcon={MessageCircleQuestion} onClick={() => navigate(`/doubts?mode=text&q=${encodeURIComponent(q.questionText)}`)}>Ask a doubt about this</Button>
+                {doubtApi.available !== false && <Button variant="ghost" size="sm" leftIcon={MessageCircleQuestion} onClick={() => navigate(`/doubts?mode=text&q=${encodeURIComponent(q.questionText)}`)}>Ask a doubt about this</Button>}
                 <ReportQuestionButton questionId={q.questionId} />
               </div>
               {revealed ? (

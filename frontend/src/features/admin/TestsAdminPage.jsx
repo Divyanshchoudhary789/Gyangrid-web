@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Plus, Pencil, ArrowUp, ArrowDown, X, Layers, Timer, Wand2 } from 'lucide-react';
-import { Card, Button, TextField, TextArea, SelectField, Checkbox, Tabs, Modal, PageSkeleton, ErrorState, Badge, Switch } from '@/components/ui';
+import { Plus, Pencil, ArrowUp, ArrowDown, X, Layers, Timer, Wand2, Trash2 } from 'lucide-react';
+import { Card, Button, TextField, TextArea, SelectField, Checkbox, Tabs, Modal, ConfirmDialog, PageSkeleton, ErrorState, Badge, Switch } from '@/components/ui';
 import { MathText } from '@/components/math/MathText';
 import { useQuery } from '@/hooks/useQuery';
 import { adminApi } from '@/services/api/admin';
@@ -9,15 +9,26 @@ import { errorMessage } from '@/services/errors';
 import { useDocumentTitle } from '@/hooks/useCommon';
 import { humanDuration } from '@/lib/date';
 import { cn } from '@/lib/cn';
-import { AdminPageHeader, AdminTable, ClassSelect, StatusBadge, useCan, ReadOnlyNote } from './adminShared';
+import { AdminPageHeader, AdminTable, ClassSelect, StatusBadge, useCan, ReadOnlyNote, ADMIN_CAPS, supports } from './adminShared';
+
+const KIND_OPTIONS = [{ value: 'CHAPTER', label: 'Chapter test' }, { value: 'FULL', label: 'Full syllabus' }, { value: 'SERIES', label: 'Series test' }]
+  .filter((k) => !ADMIN_CAPS || ADMIN_CAPS.testKinds.includes(k.value));
 
 const DEFAULT_INSTRUCTIONS = 'Read every question carefully.\nThe timer runs on the server and does not pause.\nYour answers are saved automatically.';
+
+/** ISO → the local value a datetime-local input expects. */
+const toLocalInput = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+};
 
 function TestBuilder({ open, onClose, classId, test, onSaved }) {
   const { data: cur } = useQuery(`admin:curriculum:${classId}`, () => adminApi.curriculum(classId));
   const [f, setF] = useState(null);
   const [poolChapter, setPoolChapter] = useState('');
   const [busy, setBusy] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const { data: pool } = useQuery(`admin:pool:${poolChapter}`, () => adminApi.questions({ classId, chapterId: poolChapter, status: 'APPROVED', pageSize: 50 }), { enabled: Boolean(poolChapter) });
 
   useEffect(() => {
@@ -25,7 +36,9 @@ function TestBuilder({ open, onClose, classId, test, onSaved }) {
     setF(test ? {
       title: test.title, kind: test.kind, chapterIds: test.chapterIds, durationMin: Math.round(test.durationSec / 60), marksPerQ: test.marksPerQ, negativeMarks: test.negativeMarks,
       allowNegativeTotal: test.allowNegativeTotal, reattempt: test.reattempt, instructions: test.instructions.join('\n'), questionIds: test.questionIds, status: test.status,
-    } : { title: '', kind: 'CHAPTER', chapterIds: [], durationMin: 15, marksPerQ: 1, negativeMarks: 0, allowNegativeTotal: false, reattempt: true, instructions: DEFAULT_INSTRUCTIONS, questionIds: [], status: 'DRAFT' });
+      description: test.description || '', passingMarks: test.passingMarks ?? '', maxAttempts: test.maxAttempts ?? '',
+      publishFrom: toLocalInput(test.publishFrom), publishTo: toLocalInput(test.publishTo),
+    } : { maxAttempts: '', publishFrom: '', publishTo: '', title: '', description: '', kind: 'CHAPTER', chapterIds: [], durationMin: 15, marksPerQ: 1, negativeMarks: 0, allowNegativeTotal: false, reattempt: true, instructions: DEFAULT_INSTRUCTIONS, questionIds: [], status: 'DRAFT', passingMarks: '' });
     setPoolChapter(test?.chapterIds?.[0] || '');
   }, [open, test]);
 
@@ -41,7 +54,7 @@ function TestBuilder({ open, onClose, classId, test, onSaved }) {
   const save = async (status) => {
     setBusy(true);
     try {
-      const body = { ...f, classId, status, durationSec: Number(f.durationMin) * 60, marksPerQ: Number(f.marksPerQ), negativeMarks: Number(f.negativeMarks), instructions: f.instructions.split('\n') };
+      const body = { ...f, classId, status, durationSec: Number(f.durationMin) * 60, marksPerQ: Number(f.marksPerQ), negativeMarks: Number(f.negativeMarks), instructions: f.instructions.split('\n'), passingMarks: f.passingMarks === '' ? null : Number(f.passingMarks) };
       if (test) await adminApi.updateTest(test.id, body); else await adminApi.createTest(body);
       toast.success(status === 'PUBLISHED' ? 'Test published.' : 'Test saved as draft.');
       onSaved();
@@ -49,28 +62,53 @@ function TestBuilder({ open, onClose, classId, test, onSaved }) {
     } catch (e) { toast.error(errorMessage(e)); } finally { setBusy(false); }
   };
 
+  const remove = async () => {
+    setBusy(true);
+    try {
+      await adminApi.deleteTest(test.id);
+      toast.success('Test deleted.');
+      setConfirmDelete(false);
+      onSaved();
+      onClose();
+    } catch (e) { toast.error(errorMessage(e)); } finally { setBusy(false); }
+  };
+
   return (
     <Modal open={open} onClose={onClose} size="xl" title={test ? 'Edit test' : 'Build a test'} description={`Class ${classId} · only approved questions can be attached`}
-      footer={<><Button variant="outline" onClick={onClose}>Cancel</Button><Button variant="secondary" loading={busy} onClick={() => save('DRAFT')}>Save draft</Button><Button loading={busy} onClick={() => save('PUBLISHED')}>Publish</Button></>}
+      footer={<>{test && adminApi.deleteTest && <Button variant="ghost" leftIcon={Trash2} className="mr-auto text-rose-600" onClick={() => setConfirmDelete(true)}>Delete</Button>}<Button variant="outline" onClick={onClose}>Cancel</Button><Button variant="secondary" loading={busy} onClick={() => save('DRAFT')}>Save draft</Button><Button loading={busy} onClick={() => save('PUBLISHED')}>Publish</Button></>}
     >
+      <ConfirmDialog open={confirmDelete} onClose={() => setConfirmDelete(false)} onConfirm={remove} loading={busy} tone="danger" title="Delete this test?" description="Students who already took it keep their results." confirmLabel="Delete" />
       <div className="grid gap-5 lg:grid-cols-2">
         <div className="space-y-3">
           <TextField label="Title" value={f.title} onChange={(e) => set({ title: e.target.value })} data-autofocus />
+          {ADMIN_CAPS && <TextArea label="Description" value={f.description} onChange={(e) => set({ description: e.target.value })} rows={2} />}
           <div className="grid grid-cols-2 gap-3">
-            <SelectField label="Type" value={f.kind} onChange={(e) => set({ kind: e.target.value })} options={[{ value: 'CHAPTER', label: 'Chapter test' }, { value: 'FULL', label: 'Full syllabus' }, { value: 'SERIES', label: 'Series test' }]} />
+            <SelectField label="Type" value={f.kind} onChange={(e) => set({ kind: e.target.value, chapterIds: e.target.value === 'CHAPTER' ? f.chapterIds.slice(0, 1) : f.chapterIds })} options={KIND_OPTIONS} />
             <TextField label="Duration (min)" type="number" min={1} value={f.durationMin} onChange={(e) => set({ durationMin: e.target.value })} />
             <TextField label="Marks per question" type="number" min={0.5} step={0.5} value={f.marksPerQ} onChange={(e) => set({ marksPerQ: e.target.value })} />
-            <TextField label="Negative marks" type="number" min={0} step={0.25} value={f.negativeMarks} onChange={(e) => set({ negativeMarks: e.target.value })} hint="0 = off (default)" />
+            {supports('negativeMarking') && <TextField label="Negative marks" type="number" min={0} step={0.25} value={f.negativeMarks} onChange={(e) => set({ negativeMarks: e.target.value })} hint="0 = off (default)" />}
+            {supports('passingMarks', false) && <TextField label="Passing marks" type="number" min={0} value={f.passingMarks} onChange={(e) => set({ passingMarks: e.target.value })} hint="Blank = 40% of total" />}
+            {supports('maxAttempts', false) && <TextField label="Max attempts" type="number" min={1} value={f.maxAttempts} onChange={(e) => set({ maxAttempts: e.target.value })} hint="Blank = unlimited" />}
           </div>
-          <Switch label="Allow re-attempts" description="First attempt still counts for rankings." checked={f.reattempt} onChange={(v) => set({ reattempt: v })} />
-          <Switch label="Allow negative totals" description="Otherwise the score is floored at 0." checked={f.allowNegativeTotal} onChange={(v) => set({ allowNegativeTotal: v })} />
+          {supports('publishWindow', false) && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <TextField label="Available from" type="datetime-local" value={f.publishFrom} onChange={(e) => set({ publishFrom: e.target.value })} />
+              <TextField label="Available until" type="datetime-local" value={f.publishTo} onChange={(e) => set({ publishTo: e.target.value })} />
+            </div>
+          )}
+          {supports('reattemptPolicy') && <Switch label="Allow re-attempts" description="First attempt still counts for rankings." checked={f.reattempt} onChange={(v) => set({ reattempt: v })} />}
+          {supports('negativeMarking') && <Switch label="Allow negative totals" description="Otherwise the score is floored at 0." checked={f.allowNegativeTotal} onChange={(v) => set({ allowNegativeTotal: v })} />}
           <div>
-            <p className="label">Chapters covered</p>
+            <p className="label">{ADMIN_CAPS && f.kind === 'CHAPTER' ? 'Chapter' : 'Chapters covered'}</p>
             <div className="max-h-40 space-y-1.5 overflow-y-auto rounded-xl border border-ink-100 p-3">
-              {(cur?.chapters || []).map((c) => <Checkbox key={c.id} checked={f.chapterIds.includes(c.id)} onChange={(v) => set({ chapterIds: v ? [...f.chapterIds, c.id] : f.chapterIds.filter((x) => x !== c.id) })} label={c.name} />)}
+              {(cur?.chapters || []).map((c) => (
+                <Checkbox key={c.id} checked={f.chapterIds.includes(c.id)} label={c.name}
+                  onChange={(v) => set({ chapterIds: ADMIN_CAPS && f.kind === 'CHAPTER' ? (v ? [c.id] : []) : v ? [...f.chapterIds, c.id] : f.chapterIds.filter((x) => x !== c.id) })}
+                />
+              ))}
             </div>
           </div>
-          <TextArea label="Instructions (one per line)" value={f.instructions} onChange={(e) => set({ instructions: e.target.value })} rows={4} />
+          {supports('testInstructions') && <TextArea label="Instructions (one per line)" value={f.instructions} onChange={(e) => set({ instructions: e.target.value })} rows={4} />}
         </div>
         <div>
           <div className="mb-2 flex items-end gap-2">
@@ -82,7 +120,7 @@ function TestBuilder({ open, onClose, classId, test, onSaved }) {
             {!pool ? <p className="p-4 text-center text-sm text-ink-400">Pick a chapter to browse approved questions.</p> : pool.items.map((q) => (
               <label key={q.questionId} className={cn('flex cursor-pointer items-start gap-2 rounded-lg p-2 text-sm hover:bg-ink-50', f.questionIds.includes(q.questionId) && 'bg-brand-50')}>
                 <input type="checkbox" className="mt-1" checked={f.questionIds.includes(q.questionId)} onChange={() => toggleQ(q.questionId)} />
-                <span className="min-w-0"><MathText text={q.questionText} className="line-clamp-2" /><span className="block text-[11px] text-ink-400">{q.questionId} · {q.difficulty}</span></span>
+                <span className="min-w-0"><MathText text={q.questionText} className="line-clamp-2" /><span className="block text-[11px] text-ink-400">{ADMIN_CAPS ? q.topicName || '' : q.questionId} · {q.difficulty}</span></span>
               </label>
             ))}
           </div>
@@ -95,6 +133,17 @@ function TestBuilder({ open, onClose, classId, test, onSaved }) {
 function SeriesBuilder({ open, onClose, classId, series, tests, onSaved }) {
   const [f, setF] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const remove = async () => {
+    setBusy(true);
+    try {
+      await adminApi.deleteSeries(series.id);
+      toast.success('Series deleted.');
+      setConfirmDelete(false);
+      onSaved();
+      onClose();
+    } catch (e) { toast.error(errorMessage(e)); } finally { setBusy(false); }
+  };
   useEffect(() => {
     if (open) setF(series ? { title: series.title, description: series.description, unlockMode: series.unlockMode, testIds: series.testIds, status: series.status } : { title: '', description: '', unlockMode: 'SEQUENTIAL', testIds: [], status: 'DRAFT' });
   }, [open, series]);
@@ -113,12 +162,13 @@ function SeriesBuilder({ open, onClose, classId, series, tests, onSaved }) {
   const available = tests.filter((t) => !f.testIds.includes(t.id));
   return (
     <Modal open={open} onClose={onClose} size="lg" title={series ? 'Edit series' : 'New test series'}
-      footer={<><Button variant="outline" onClick={onClose}>Cancel</Button><Button variant="secondary" loading={busy} onClick={() => save('DRAFT')}>Save draft</Button><Button loading={busy} onClick={() => save('PUBLISHED')}>Publish</Button></>}
+      footer={<>{series && adminApi.deleteSeries && <Button variant="ghost" leftIcon={Trash2} className="mr-auto text-rose-600" onClick={() => setConfirmDelete(true)}>Delete</Button>}<Button variant="outline" onClick={onClose}>Cancel</Button><Button variant="secondary" loading={busy} onClick={() => save('DRAFT')}>Save draft</Button><Button loading={busy} onClick={() => save('PUBLISHED')}>Publish</Button></>}
     >
+      <ConfirmDialog open={confirmDelete} onClose={() => setConfirmDelete(false)} onConfirm={remove} loading={busy} tone="danger" title="Delete this series?" description="The tests inside it are not deleted." confirmLabel="Delete" />
       <div className="space-y-3">
         <TextField label="Title" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} />
         <TextArea label="Description" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} rows={2} />
-        <SelectField label="Unlocking" value={f.unlockMode} onChange={(e) => setF({ ...f, unlockMode: e.target.value })} options={[{ value: 'SEQUENTIAL', label: 'Sequential — each test unlocks after the previous' }, { value: 'OPEN', label: 'Open — all tests available' }]} />
+        {supports('seriesUnlockMode') && <SelectField label="Unlocking" value={f.unlockMode} onChange={(e) => setF({ ...f, unlockMode: e.target.value })} options={[{ value: 'SEQUENTIAL', label: 'Sequential — each test unlocks after the previous' }, { value: 'OPEN', label: 'Open — all tests available' }]} />}
         <p className="label">Tests in order</p>
         <ol className="space-y-1.5">
           {f.testIds.map((id, i) => {
@@ -170,7 +220,7 @@ export default function TestsAdminPage() {
             { key: 'kind', label: 'Type', render: (t) => <Badge>{t.kind}</Badge> },
             { key: 'q', label: 'Questions', render: (t) => t.questionCount },
             { key: 'dur', label: 'Duration', render: (t) => humanDuration(t.durationSec) },
-            { key: 'marks', label: 'Marking', className: 'text-xs', render: (t) => `${t.marksPerQ}/Q${t.negativeMarks ? ` · −${t.negativeMarks}` : ''}` },
+            { key: 'marks', label: 'Marking', className: 'text-xs', render: (t) => `${t.marksPerQ}/Q${t.negativeMarks ? ` · −${t.negativeMarks}` : ''}${t.passingMarks != null ? ` · pass ${t.passingMarks}/${t.totalMarks}` : ''}` },
             { key: 'status', label: 'Status', render: (t) => <StatusBadge status={t.status} /> },
             { key: 'edit', label: '', render: () => canEdit && <Pencil className="h-4 w-4 text-ink-300" /> },
           ]}
@@ -184,7 +234,7 @@ export default function TestsAdminPage() {
                 <StatusBadge status={s.status} />
               </div>
               <ol className="mt-4 space-y-1 text-sm">{s.testIds.map((id, i) => <li key={id} className="truncate text-ink-600">{i + 1}. {data.tests.find((t) => t.id === id)?.title || id}</li>)}</ol>
-              <div className="mt-4 flex items-center justify-between"><Badge tone="info">{s.unlockMode}</Badge>{canEdit && <Button size="sm" variant="outline" leftIcon={Pencil} onClick={() => setEditSeries(s)}>Edit</Button>}</div>
+              <div className="mt-4 flex items-center justify-between">{supports('seriesUnlockMode') ? <Badge tone="info">{s.unlockMode}</Badge> : <span />}{canEdit && <Button size="sm" variant="outline" leftIcon={Pencil} onClick={() => setEditSeries(s)}>Edit</Button>}</div>
             </Card>
           ))}
         </div>

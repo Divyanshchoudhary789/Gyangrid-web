@@ -7,7 +7,7 @@ import { useQuery } from '@/hooks/useQuery';
 import { progressApi } from '@/services/api/student';
 import { useDocumentTitle } from '@/hooks/useCommon';
 import { humanDuration, shortDay, istDateKey } from '@/lib/date';
-import { masteryBand, formatNumber } from '@/lib/format';
+import { masteryBand, formatNumber, plural } from '@/lib/format';
 import { cn } from '@/lib/cn';
 
 /** Every metric can be tapped to see how it is calculated (F9-04). */
@@ -68,8 +68,8 @@ export default function ProgressPage() {
         </div>
         <p className="mt-3 flex flex-wrap gap-4 text-xs text-ink-500"><span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-flame-500" />Challenge done</span><span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-brand-100" />Active</span></p>
         <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Metric icon={Flame} cls="text-flame-500" label="Current streak" value={`${a.currentStreak} days`} hint={`Longest: ${a.longestStreak}`} info="streak" onInfo={setExplain} />
-          <Metric icon={CalendarDays} cls="text-brand-500" label="Active this week" value={`${a.activeDaysWeek}/7`} hint={`${a.activeDaysMonth} days this month`} />
+          <Metric icon={Flame} cls="text-flame-500" label="Current streak" value={plural(a.currentStreak, 'day')} hint={`Longest: ${a.longestStreak}`} info="streak" onInfo={setExplain} />
+          <Metric icon={CalendarDays} cls="text-brand-500" label="Active this week" value={`${a.activeDaysWeek}/7`} hint={`${plural(a.activeDaysMonth, 'day')} this month`} />
           <Metric icon={Clock} cls="text-sky-500" label="Time spent" value={humanDuration(a.timeSpentSec)} info="time" onInfo={setExplain} />
           <Metric icon={Target} cls="text-emerald-500" label="Questions" value={formatNumber(perf.questionsAttempted)} hint="answered in total" />
         </div>
@@ -142,7 +142,7 @@ export default function ProgressPage() {
             ))}
           </div>
           <div className="mt-4"><div className="mb-1.5 flex items-center justify-between text-sm"><span className="flex items-center text-ink-500">Resolution rate<InfoButton k="resolution" onOpen={setExplain} /></span><span className="font-bold">{mk.resolutionRate ?? 0}%</span></div><ProgressBar value={mk.resolutionRate ?? 0} tone="success" /></div>
-          {mk.mostRepeatedTopic && <p className="mt-4 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">Most repeated: <strong>{mk.mostRepeatedTopic.name}</strong> ({mk.mostRepeatedTopic.count}×)</p>}
+          {mk.mostRepeatedTopic && <p className="mt-4 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">Most repeated: <strong>{mk.mostRepeatedTopic.name}</strong>{mk.mostRepeatedTopic.count ? ` (${mk.mostRepeatedTopic.count}×)` : ''}</p>}
           <Link to="/mistakes" className="mt-4 inline-flex text-sm font-bold text-brand-600 hover:underline">Open Mistake Bank →</Link>
         </Card>
         <Card>
@@ -153,8 +153,8 @@ export default function ProgressPage() {
           </div>
           <ul className="mt-5 space-y-2 text-sm">
             <li className="flex justify-between"><span className="flex items-center gap-1.5 text-ink-500"><Coins className="h-4 w-4 text-gold-500" />Gold Coins</span><span className="font-bold">{g.goldCoins}</span></li>
-            <li className="flex justify-between"><span className="flex items-center gap-1.5 text-ink-500"><Trophy className="h-4 w-4 text-brand-500" />Weekly rank</span><span className="font-bold">#{g.rank} of {g.classSize}</span></li>
-            <li className="flex justify-between"><span className="flex items-center gap-1.5 text-ink-500"><Zap className="h-4 w-4 text-flame-500" />Streak</span><span className="font-bold">{g.currentStreak} days</span></li>
+            <li className="flex justify-between"><span className="flex items-center gap-1.5 text-ink-500"><Trophy className="h-4 w-4 text-brand-500" />Weekly rank</span><span className="font-bold">{g.rank ? `#${g.rank}${g.classSize ? ` of ${g.classSize}` : ''}` : '—'}</span></li>
+            <li className="flex justify-between"><span className="flex items-center gap-1.5 text-ink-500"><Zap className="h-4 w-4 text-flame-500" />Streak</span><span className="font-bold">{plural(g.currentStreak, 'day')}</span></li>
           </ul>
           <Link to="/rewards" className="mt-4 inline-flex text-sm font-bold text-brand-600 hover:underline">See rewards →</Link>
         </Card>

@@ -4,7 +4,7 @@ import { PageHeader, Card, Tabs, PageSkeleton, ErrorState, EmptyState, Alert } f
 import { useQuery } from '@/hooks/useQuery';
 import { progressApi } from '@/services/api/student';
 import { useDocumentTitle } from '@/hooks/useCommon';
-import { formatNumber } from '@/lib/format';
+import { formatNumber, plural } from '@/lib/format';
 import { formatDateTime } from '@/lib/date';
 import { cn } from '@/lib/cn';
 
@@ -16,10 +16,28 @@ export default function RewardsPage() {
   if (loading && !r) return <PageSkeleton rows={2} />;
   if (!r) return <ErrorState error={error} onRetry={refetch} />;
 
-  const today = [
-    { done: r.today.challenge, icon: Target, title: 'Daily Challenge', text: `Complete today's challenge with ${r.rules.challengeMinScore}% or more`, coins: r.rules.challengeCoins },
-    { done: r.today.doubt, icon: MessageCircleQuestion, title: 'Solve a doubt', text: 'Answer the tutor’s follow-up question correctly', coins: r.rules.doubtCoins },
-  ];
+  // Server-configured goals when available; otherwise the mock's fixed rules.
+  const today = r.dailyGoals?.length
+    ? r.dailyGoals.map((g) => ({ done: g.completed, icon: g.key === 'DOUBT' ? MessageCircleQuestion : Target, title: g.key === 'DOUBT' ? 'Solve a doubt' : 'Daily Challenge', text: g.label, coins: g.coins }))
+    : [
+      { done: r.today.challenge, icon: Target, title: 'Daily Challenge', text: `Complete today's challenge with ${r.rules.challengeMinScore}% or more`, coins: r.rules.challengeCoins },
+      { done: r.today.doubt, icon: MessageCircleQuestion, title: 'Solve a doubt', text: 'Answer the tutor’s follow-up question correctly', coins: r.rules.doubtCoins },
+    ];
+  const earnRows = r.rules.xpList
+    ? [
+      ...r.rules.xpList.map((x) => [x.label.replace(/ learning activity$/i, '').replace(/^\w/, (c) => c.toUpperCase()), `${x.amount} XP`]),
+      ...(r.rules.coinList || []).map((c) => [c.label, `${c.amount} Gold Coins${c.frequency ? ` · ${c.frequency}` : ''}`]),
+    ]
+    : [
+      ['Complete the Daily Challenge', `${r.rules.xp.DAILY_CHALLENGE} XP`],
+      ['All 5 correct bonus', `${r.rules.xp.ALL_CORRECT_BONUS} XP`],
+      ['Correct practice question', `${r.rules.xp.PRACTICE_QUESTION} XP (up to ${r.rules.xp.PRACTICE_DAILY_CAP}/day)`],
+      ['Resolve a mistake', `${r.rules.xp.MISTAKE_RESOLVED} XP (up to ${r.rules.xp.MISTAKE_DAILY_CAP}/day)`],
+      ['Complete a test (first attempt)', `${r.rules.xp.TEST_COMPLETED} XP`],
+      ['Understand a doubt', `${r.rules.xp.DOUBT_UNDERSTOOD} XP (up to ${r.rules.xp.DOUBT_DAILY_CAP}/day)`],
+      ['Streak milestones', Object.entries(r.rules.xp.STREAK_MILESTONES).map(([d, x]) => `${d}d: ${x}`).join(' · ')],
+      ['Tests', 'XP only — coins are for daily habits'],
+    ];
 
   return (
     <div className="space-y-6">
@@ -34,7 +52,7 @@ export default function RewardsPage() {
         </div>
         <div className="grid grid-cols-1 gap-4">
           <Card className="flex items-center gap-3 p-5 sm:p-5"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-100 text-brand-600"><Zap className="h-5 w-5" /></span><div><p className="font-display text-2xl font-bold">{formatNumber(r.totalXp)}</p><p className="text-xs font-semibold text-ink-500">Total XP</p></div></Card>
-          <Card className="flex items-center gap-3 p-5 sm:p-5"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-flame-100 text-flame-600"><Flame className="h-5 w-5" /></span><div><p className="font-display text-2xl font-bold">{r.streak.current} days</p><p className="text-xs font-semibold text-ink-500">Streak · best {r.streak.longest}</p></div></Card>
+          <Card className="flex items-center gap-3 p-5 sm:p-5"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-flame-100 text-flame-600"><Flame className="h-5 w-5" /></span><div><p className="font-display text-2xl font-bold">{plural(r.streak.current, 'day')}</p><p className="text-xs font-semibold text-ink-500">Streak · best {r.streak.longest}</p></div></Card>
         </div>
       </div>
 
@@ -50,7 +68,7 @@ export default function RewardsPage() {
             </div>
           ))}
         </div>
-        {r.rules.bothBonus?.enabled && <p className="mt-3 text-sm text-ink-600">Do both today for a bonus of +{r.rules.bothBonus.amount} coins!</p>}
+        {r.rules?.bothBonus?.enabled && <p className="mt-3 text-sm text-ink-600">Do both today for a bonus of +{r.rules.bothBonus.amount} coins!</p>}
       </Card>
 
       <Alert tone="info" title="What are Gold Coins for?">Coins show that you learn every day. In a future update you&apos;ll be able to use them for fun things like avatars and badges. They have no cash value.</Alert>
@@ -81,16 +99,7 @@ export default function RewardsPage() {
         ) : <EmptyState emoji="⚡" title="No XP yet" />)}
         {tab === 'how' && (
           <div className="grid gap-2 sm:grid-cols-2">
-            {[
-              ['Complete the Daily Challenge', `${r.rules.xp.DAILY_CHALLENGE} XP`],
-              ['All 5 correct bonus', `${r.rules.xp.ALL_CORRECT_BONUS} XP`],
-              ['Correct practice question', `${r.rules.xp.PRACTICE_QUESTION} XP (up to ${r.rules.xp.PRACTICE_DAILY_CAP}/day)`],
-              ['Resolve a mistake', `${r.rules.xp.MISTAKE_RESOLVED} XP (up to ${r.rules.xp.MISTAKE_DAILY_CAP}/day)`],
-              ['Complete a test (first attempt)', `${r.rules.xp.TEST_COMPLETED} XP`],
-              ['Understand a doubt', `${r.rules.xp.DOUBT_UNDERSTOOD} XP (up to ${r.rules.xp.DOUBT_DAILY_CAP}/day)`],
-              ['Streak milestones', Object.entries(r.rules.xp.STREAK_MILESTONES).map(([d, x]) => `${d}d: ${x}`).join(' · ')],
-              ['Tests', 'XP only — coins are for daily habits'],
-            ].map(([k, v]) => (
+            {earnRows.map(([k, v]) => (
               <div key={k} className="rounded-xl bg-ink-50 px-4 py-3"><p className="text-sm font-semibold text-ink-800">{k}</p><p className="text-xs text-ink-500">{v}</p></div>
             ))}
           </div>

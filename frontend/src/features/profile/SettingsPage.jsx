@@ -2,15 +2,15 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { UserRound, GraduationCap, Bell, ShieldCheck, Download, Trash2, LogOut, ChevronRight, Mail, FileText } from 'lucide-react';
-import { PageHeader, Card, CardHeader, Button, TextField, Switch, ChoiceCard, Modal, ConfirmDialog, Alert, Avatar } from '@/components/ui';
+import { PageHeader, Card, CardHeader, Button, TextField, Switch, ChoiceCard, Modal, ConfirmDialog, Alert, Avatar, Skeleton } from '@/components/ui';
 import { useAuthStore } from '@/store/authStore';
-import { accountApi } from '@/services/api/student';
+import { accountApi, curriculumApi } from '@/services/api/student';
 import { errorMessage } from '@/services/errors';
-import { invalidate, clearQueryCache } from '@/hooks/useQuery';
+import { invalidate, clearQueryCache, useQuery } from '@/hooks/useQuery';
 import { useDocumentTitle } from '@/hooks/useCommon';
 import { isValidName } from '@/lib/validators';
 import { formatDate } from '@/lib/date';
-import { CLASSES } from '@/config/constants';
+import { classLabel, boardLabel } from '@/features/shared/userDisplay';
 import { signOut } from '@/features/auth/session';
 import { AvatarPicker } from './AvatarPicker';
 
@@ -22,6 +22,11 @@ export default function SettingsPage() {
   const [savingName, setSavingName] = useState(false);
   const [classOpen, setClassOpen] = useState(false);
   const [newClass, setNewClass] = useState(user?.profile?.classId);
+  // Classes of the student's own board, from the live curriculum (class ids are board-specific).
+  const { data: boards } = useQuery('boardsWithClasses', curriculumApi.boardsWithClasses, { persist: true, staleMs: 3600000, enabled: classOpen });
+  const board = boards?.find((b) => b._id === user?.profile?.boardId) || boards?.[0];
+  const classOptions = board?.classes || [];
+  const newGrade = classOptions.find((c) => c._id === newClass)?.grade;
   const [classBusy, setClassBusy] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -49,7 +54,7 @@ export default function SettingsPage() {
       setUser(await accountApi.changeClass(newClass));
       clearQueryCache();
       invalidate('');
-      toast.success(`Switched to Class ${newClass}. Your XP, coins and streak are unchanged.`);
+      toast.success(`Switched to Class ${newGrade ?? ''}. Your XP, coins and streak are unchanged.`);
       setClassOpen(false);
     } catch (e) { toast.error(errorMessage(e)); } finally { setClassBusy(false); }
   };
@@ -89,14 +94,15 @@ export default function SettingsPage() {
           <TextField label="Your name" value={name} onChange={(e) => setName(e.target.value)} className="flex-1" hint={`Classmates see “${user?.displayName}”.`} />
           <Button variant="secondary" onClick={saveName} loading={savingName} disabled={name.trim() === user?.name}>Save</Button>
         </div>
-        {!user?.emailVerified && <Alert tone="info" className="mt-4" title="Email not verified">Verify your email from the Home screen to unlock rewards.</Alert>}
+        {!user?.emailVerified && <Alert tone="info" className="mt-4" title="Email not verified">Verify your email from the Home screen so you can always get back into your account.</Alert>}
       </Card>
 
       <Card>
-        <CardHeader icon={GraduationCap} title="Class" subtitle={`Class ${user?.profile?.classId} · NCERT / CBSE`} action={<Button size="sm" variant="outline" onClick={() => setClassOpen(true)}>Change</Button>} />
+        <CardHeader icon={GraduationCap} title="Class" subtitle={`${classLabel(user)} · ${boardLabel(user)}`} action={<Button size="sm" variant="outline" onClick={() => setClassOpen(true)}>Change</Button>} />
         <p className="text-sm text-ink-500">Moved up a class? Change it here. Your history is kept separately for each class, and your XP, coins and streak stay the same.</p>
       </Card>
 
+      {accountApi.supportsReminders !== false && (
       <Card>
         <CardHeader icon={Bell} title="Reminders" />
         <div className="space-y-5">
@@ -110,14 +116,20 @@ export default function SettingsPage() {
           <Switch label="Sounds & celebrations" description="Play a sound when you earn a reward." checked={settings.sound} onChange={(v) => patch({ sound: v })} />
         </div>
       </Card>
+      )}
 
       <Card>
         <CardHeader icon={ShieldCheck} title="Parent & privacy" />
         <Link to="/settings/parent-report" className="flex items-center gap-3 rounded-xl border border-ink-100 p-4 transition hover:bg-ink-50">
           <Mail className="h-5 w-5 text-emerald-500" />
-          <span className="flex-1"><span className="block font-semibold text-ink-900">Weekly parent report</span><span className="block text-sm text-ink-500">Sent to {user?.profile?.parent?.contactMasked} every Sunday. See exactly what it contains.</span></span>
+          <span className="flex-1"><span className="block font-semibold text-ink-900">Weekly parent report</span><span className="block text-sm text-ink-500">{user?.profile?.parent?.contactMasked ? `For ${user.profile.parent.contactMasked}. ` : ''}See exactly what it will contain.</span></span>
           <ChevronRight className="h-5 w-5 text-ink-300" />
         </Link>
+        {accountApi.supportsReminders !== false && (
+          <div className="mt-4">
+            <Switch label="Send my parent a weekly report" description="A short Sunday summary of your week. Never includes your doubts or answers." checked={settings.parentReport !== false} onChange={(v) => patch({ parentReport: v }, v ? 'Weekly parent report on.' : 'Weekly parent report off.')} />
+          </div>
+        )}
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           <Button variant="outline" leftIcon={Download} loading={exporting} onClick={exportData}>Download my data</Button>
           <Button variant="outline" leftIcon={FileText} to="/privacy">Privacy policy</Button>
@@ -133,10 +145,14 @@ export default function SettingsPage() {
         </div>
       </Card>
 
-      <Modal open={classOpen} onClose={() => setClassOpen(false)} title="Change class" description="Your syllabus switches straight away." footer={<><Button variant="outline" onClick={() => setClassOpen(false)}>Cancel</Button><Button onClick={changeClass} loading={classBusy} disabled={newClass === user?.profile?.classId}>Switch to Class {newClass}</Button></>}>
-        <div className="grid grid-cols-5 gap-2">
-          {CLASSES.map((c) => <ChoiceCard key={c} selected={newClass === c} onClick={() => setNewClass(c)} className="py-4 text-center font-display text-lg font-bold">{c}</ChoiceCard>)}
-        </div>
+      <Modal open={classOpen} onClose={() => setClassOpen(false)} title="Change class" description="Your syllabus switches straight away." footer={<><Button variant="outline" onClick={() => setClassOpen(false)}>Cancel</Button><Button onClick={changeClass} loading={classBusy} disabled={!newGrade || newClass === user?.profile?.classId}>{newGrade ? `Switch to Class ${newGrade}` : 'Choose a class'}</Button></>}>
+        {!boards ? (
+          <div className="grid grid-cols-5 gap-2">{[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-14 rounded-2xl" />)}</div>
+        ) : (
+          <div className="grid grid-cols-5 gap-2">
+            {classOptions.map((c) => <ChoiceCard key={c._id} selected={newClass === c._id} onClick={() => setNewClass(c._id)} className="py-4 text-center font-display text-lg font-bold">{c.grade}</ChoiceCard>)}
+          </div>
+        )}
       </Modal>
       <ConfirmDialog
         open={deleteOpen} onClose={() => setDeleteOpen(false)} onConfirm={deleteAccount} loading={deleting} tone="danger"

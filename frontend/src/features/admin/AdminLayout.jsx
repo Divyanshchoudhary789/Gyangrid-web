@@ -1,4 +1,4 @@
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { LayoutDashboard, FolderTree, FileText, ListChecks, Timer, Database, SlidersHorizontal, Users, ShieldAlert, ScrollText, LogOut, Menu, X } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
@@ -7,7 +7,7 @@ import { useAdminStore } from '@/store/authStore';
 import { adminApi } from '@/services/api/admin';
 import { ROLE_LABELS } from '@/config/constants';
 import { cn } from '@/lib/cn';
-import { CAN } from './adminShared';
+import { CAN, ADMIN_CAPS, supports } from './adminShared';
 
 const NAV = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -15,10 +15,10 @@ const NAV = [
   { to: '/admin/materials', label: 'Study Material', icon: FileText },
   { to: '/admin/questions', label: 'Question Bank', icon: ListChecks },
   { to: '/admin/tests', label: 'Tests & Series', icon: Timer },
-  { to: '/admin/knowledge-base', label: 'AI Knowledge Base', icon: Database, perm: 'kb' },
+  { to: '/admin/knowledge-base', label: 'AI Knowledge Base', icon: Database, perm: 'kb', cap: 'kb' },
   { to: '/admin/config', label: 'Rewards & Config', icon: SlidersHorizontal, perm: 'viewConfig' },
   { to: '/admin/students', label: 'Students', icon: Users, perm: 'students' },
-  { to: '/admin/moderation', label: 'Moderation', icon: ShieldAlert },
+  { to: '/admin/moderation', label: 'Moderation', icon: ShieldAlert, cap: 'moderation' },
   { to: '/admin/audit', label: 'Audit Log', icon: ScrollText, perm: 'audit' },
 ];
 
@@ -27,7 +27,19 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
-  const items = NAV.filter((n) => !n.perm || CAN[n.perm].includes(admin?.role));
+  const items = NAV.filter((n) => (!n.perm || CAN[n.perm].includes(admin?.role)) && (!n.cap || supports(n.cap)));
+
+  // Real backend: re-check the Firebase session and admin role whenever the console opens.
+  useEffect(() => {
+    if (!ADMIN_CAPS) return undefined;
+    let cancelled = false;
+    adminApi.me().catch(() => {
+      if (cancelled) return;
+      clear();
+      navigate('/admin/login', { replace: true });
+    });
+    return () => { cancelled = true; };
+  }, [clear, navigate]);
 
   const logout = async () => {
     try { await adminApi.logout(); } catch { /* ignore */ }
@@ -79,7 +91,7 @@ export default function AdminLayout() {
           </p>
           <div className="flex items-center gap-2">
             <Badge tone="dark">{ROLE_LABELS[admin?.role]}</Badge>
-            <Badge tone="success">2FA verified</Badge>
+            {!ADMIN_CAPS && <Badge tone="success">2FA verified</Badge>}
           </div>
         </header>
         <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-10 lg:py-8">

@@ -10,7 +10,9 @@ import { Button, Card, ProgressBar, Skeleton, Alert, Avatar } from '@/components
 import { useHome } from '@/features/shared/useHome';
 import { REC_META, openRecommendation } from '@/features/shared/recommendation';
 import { useAuthStore } from '@/store/authStore';
-import { authApi } from '@/services/api/student';
+import { authApi, doubtApi } from '@/services/api/student';
+import { VerifyEmailCard } from '@/features/auth/VerifyEmailCard';
+import { classLabel, boardLabel } from '@/features/shared/userDisplay';
 import { errorMessage } from '@/services/errors';
 import { useDocumentTitle, useOnline } from '@/hooks/useCommon';
 import { firstName, formatNumber } from '@/lib/format';
@@ -23,6 +25,16 @@ function ChallengeCard({ challenge, streak, online }) {
   const navigate = useNavigate();
   const state = challenge?.state || 'NOT_STARTED';
   const done = state === 'COMPLETED';
+  if (state === 'UNAVAILABLE') {
+    return (
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-ink-700 to-ink-900 p-6 text-white shadow-lift sm:p-8">
+        <p className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-white/70"><Flame className="h-4 w-4" aria-hidden /> Today&apos;s Challenge</p>
+        <h2 className="mt-2 text-2xl font-bold text-white">Today&apos;s challenge is being prepared</h2>
+        <p className="mt-2 max-w-lg text-white/75">Questions for your class are still being added. Meanwhile, practise any topic to keep learning.</p>
+        <Button size="lg" variant="white" className="mt-5" leftIcon={Target} onClick={() => navigate('/practice')}>Practise now</Button>
+      </div>
+    );
+  }
   return (
     <div className={cn('relative overflow-hidden rounded-3xl p-6 text-white shadow-lift sm:p-8', done ? 'bg-gradient-to-br from-emerald-500 via-teal-500 to-sky-600' : 'bg-gradient-to-br from-brand-600 via-violet-600 to-indigo-700')}>
       <div className="bg-grid absolute inset-0 opacity-20" aria-hidden />
@@ -48,10 +60,12 @@ function ChallengeCard({ challenge, streak, online }) {
           {done && (
             <>
               <h2 className="mt-2 text-2xl font-bold text-white sm:text-3xl">Done! You scored {challenge.score}/{challenge.total} 🎉</h2>
-              <p className="mt-2 flex flex-wrap items-center gap-2 text-white/90">
-                <span className="chip bg-white/20 text-white"><Zap className="h-3.5 w-3.5" />+{challenge.xpEarned} XP</span>
-                {challenge.coinsEarned > 0 ? <span className="chip bg-gold-300 text-ink-900"><Coins className="h-3.5 w-3.5" />+{challenge.coinsEarned} coins</span> : <span className="text-sm text-white/80">Score 60%+ tomorrow to earn coins</span>}
-              </p>
+              {(challenge.xpEarned > 0 || challenge.coinsEarned > 0) && (
+                <p className="mt-2 flex flex-wrap items-center gap-2 text-white/90">
+                  {challenge.xpEarned > 0 && <span className="chip bg-white/20 text-white"><Zap className="h-3.5 w-3.5" />+{challenge.xpEarned} XP</span>}
+                  {challenge.coinsEarned > 0 && <span className="chip bg-gold-300 text-ink-900"><Coins className="h-3.5 w-3.5" />+{challenge.coinsEarned} coins</span>}
+                </p>
+              )}
               <p className="mt-2 text-sm text-white/80">A new challenge unlocks at midnight.</p>
             </>
           )}
@@ -74,6 +88,18 @@ function ChallengeCard({ challenge, streak, online }) {
 
 function AskDoubtCard({ online, quota }) {
   const navigate = useNavigate();
+  if (doubtApi.available === false) {
+    return (
+      <Card className="flex h-full flex-col">
+        <h2 className="section-title flex items-center gap-2"><MessageCircleQuestion className="h-5 w-5 text-emerald-500" /> AI Doubt Solver</h2>
+        <p className="muted mt-1">Ask by typing, a photo or your voice — and get step-by-step help.</p>
+        <div className="mt-5 flex flex-1 items-center gap-3 rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/60 p-4">
+          <Sparkles className="h-6 w-6 shrink-0 text-emerald-500" aria-hidden />
+          <p className="text-sm text-emerald-900"><strong>Coming soon.</strong> Your AI Maths tutor is almost ready. Until then, check the worked solutions in Practice and your Mistake Bank.</p>
+        </div>
+      </Card>
+    );
+  }
   const modes = [
     { mode: 'text', icon: Keyboard, label: 'Type', cls: 'bg-brand-50 text-brand-700 hover:bg-brand-100' },
     { mode: 'image', icon: Camera, label: 'Photo', cls: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' },
@@ -111,7 +137,7 @@ const TILES = [
   { to: '/progress', label: 'Progress', desc: 'Mastery & trends', icon: ChartLine, cls: 'from-sky-500 to-blue-600' },
 ];
 
-const ACTIVITY_ICON = { CHALLENGE: Flame, PRACTICE: Target, TEST: Timer, DOUBT: MessageCircleQuestion, DOUBT_UNDERSTOOD: CheckCircle2, MISTAKE_RESOLVED: NotebookPen, STUDIED: BookOpen };
+const ACTIVITY_ICON = { CHALLENGE: Flame, PRACTICE: Target, TEST: Timer, DOUBT: MessageCircleQuestion, DOUBT_UNDERSTOOD: CheckCircle2, MISTAKE_RESOLVED: NotebookPen, MISTAKE: NotebookPen, STUDIED: BookOpen };
 
 export default function HomePage() {
   useDocumentTitle('Home');
@@ -162,7 +188,7 @@ export default function HomePage() {
           <div>
             <p className="text-sm font-semibold text-ink-500">{formatDate(new Date(), { weekday: 'long', day: 'numeric', month: 'long' })}</p>
             <h1 className="text-2xl font-bold sm:text-3xl">{greeting()}, {firstName(user?.name)}!</h1>
-            <p className="mt-0.5 text-sm text-ink-500">Class {user?.profile?.classId} · NCERT / CBSE · Level {s.level}</p>
+            <p className="mt-0.5 text-sm text-ink-500">{classLabel(user)} · {boardLabel(user)} · Level {s.level}</p>
           </div>
         </div>
         <div className="w-full sm:w-64">
@@ -177,11 +203,11 @@ export default function HomePage() {
       {error && online && data && (
         <Alert tone="warning" action={<Button size="sm" variant="outline" leftIcon={RefreshCw} onClick={refetch}>Retry</Button>}>Couldn&apos;t refresh — showing saved data.</Alert>
       )}
-      {!user?.emailVerified && (
+      {!user?.emailVerified && (authApi.requestEmailOtp ? <VerifyEmailCard /> : (
         <Alert tone="info" title="Verify your email to claim rewards" action={<Button size="sm" variant="outline" loading={verifying} onClick={verify}>I&apos;ve verified</Button>}>
           We sent a link to {user?.email}. Gold Coins unlock once your email is verified.
         </Alert>
-      )}
+      ))}
 
       <motion.div {...fade(1)}><ChallengeCard challenge={data.challenge} streak={s.currentStreak} online={online} /></motion.div>
 
@@ -211,7 +237,7 @@ export default function HomePage() {
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block font-bold text-ink-900">Review time!</span>
-                <span className="block text-sm text-ink-500">{data.reviewDue} mistake{data.reviewDue > 1 ? 's are' : ' is'} due today. Fix them for XP.</span>
+                <span className="block text-sm text-ink-500">{data.reviewDue} mistake{data.reviewDue > 1 ? 's are' : ' is'} waiting for review. Learn from them to improve.</span>
               </span>
               <ChevronRight className="h-5 w-5 text-rose-400" />
             </Link>
@@ -290,9 +316,11 @@ export default function HomePage() {
           <div className="space-y-4">
             {[
               { icon: Flame, cls: 'bg-flame-100 text-flame-600', label: 'Current streak', value: `${s.currentStreak} day${s.currentStreak === 1 ? '' : 's'}`, hint: `Best: ${s.longestStreak}` },
-              { icon: Target, cls: 'bg-brand-100 text-brand-600', label: 'Accuracy (7 days)', value: s.accuracyLast7d != null ? `${s.accuracyLast7d}%` : '—', hint: `Overall ${s.accuracyOverall ?? '—'}%` },
+              s.accuracyLast7d != null
+                ? { icon: Target, cls: 'bg-brand-100 text-brand-600', label: 'Accuracy (7 days)', value: `${s.accuracyLast7d}%`, hint: `Overall ${s.accuracyOverall ?? '—'}%` }
+                : { icon: Target, cls: 'bg-brand-100 text-brand-600', label: 'Accuracy', value: s.accuracyOverall != null ? `${s.accuracyOverall}%` : '—', hint: s.accuracyOverall != null ? 'All questions so far' : 'Answer a few questions' },
               { icon: NotebookPen, cls: 'bg-rose-100 text-rose-600', label: 'Mistakes resolved', value: `${s.mistakes.resolved}/${s.mistakes.total}`, hint: `${s.mistakes.active} still active` },
-              { icon: Trophy, cls: 'bg-gold-100 text-gold-600', label: 'Class rank (weekly)', value: s.rank?.classWeekly ? `#${s.rank.classWeekly}` : '—', hint: 'Updated every 15 min' },
+              { icon: Trophy, cls: 'bg-gold-100 text-gold-600', label: 'Class rank (weekly)', value: s.rank?.classWeekly ? `#${s.rank.classWeekly}` : '—', hint: 'This week' },
             ].map((x) => (
               <div key={x.label} className="flex items-center gap-3">
                 <span className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl', x.cls)}><x.icon className="h-5 w-5" /></span>

@@ -7,8 +7,7 @@ import { authApi } from '@/services/api/student';
 import { errorMessage } from '@/services/errors';
 import { isEmail, isValidName } from '@/lib/validators';
 import { track } from '@/lib/analytics';
-import { env } from '@/config/env';
-import { signInWithGoogleProvider } from '@/services/auth/googleProvider';
+import { isMockMode } from '@/services/http';
 import { startSession, homePathFor } from './session';
 
 function GoogleG() {
@@ -51,20 +50,26 @@ export function GoogleSignIn({ label = 'Continue with Google' }) {
 
   const customValid = isValidName(form.name) && isEmail(form.email);
 
+  const [popupBusy, setPopupBusy] = useState(false);
   const start = async () => {
-    if (env.useMockApi) { setOpen(true); return; }
+    if (isMockMode()) { setOpen(true); return; }
+    // Real mode: Firebase Google popup; the backend then syncs the identity via GET /auth/me.
+    setPopupBusy(true);
     try {
-      const res = await signInWithGoogleProvider();
+      const res = await authApi.google();
       startSession(res);
+      track(res.user.onboarded ? 'login' : 'signup_started', { method: 'google' });
       navigate(homePathFor(res.user), { replace: true });
     } catch (e) {
-      toast.error(errorMessage(e));
+      if (e.details?.firebaseCode !== 'auth/popup-closed-by-user' && e.details?.firebaseCode !== 'auth/cancelled-popup-request') toast.error(errorMessage(e));
+    } finally {
+      setPopupBusy(false);
     }
   };
 
   return (
     <>
-      <Button variant="outline" size="lg" block leftIcon={GoogleG} onClick={start}>{label}</Button>
+      <Button variant="outline" size="lg" block leftIcon={GoogleG} onClick={start} loading={popupBusy}>{label}</Button>
       <Modal open={open} onClose={() => { setOpen(false); setCustom(false); }} title="Choose an account" description="to continue to Gyaangrid" size="sm">
         {!custom ? (
           <div className="space-y-2">

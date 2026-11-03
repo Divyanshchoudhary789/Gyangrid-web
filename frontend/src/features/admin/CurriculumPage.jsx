@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { ArrowUp, ArrowDown, Plus, ChevronDown, Pencil, Check, X } from 'lucide-react';
-import { Card, Button, TextField, PageSkeleton, ErrorState, Modal } from '@/components/ui';
+import { ArrowUp, ArrowDown, Plus, ChevronDown, Pencil, Check, X, Trash2 } from 'lucide-react';
+import { Card, Button, TextField, PageSkeleton, ErrorState, Modal, ConfirmDialog } from '@/components/ui';
 import { useQuery } from '@/hooks/useQuery';
 import { adminApi } from '@/services/api/admin';
 import { errorMessage } from '@/services/errors';
 import { useDocumentTitle } from '@/hooks/useCommon';
 import { cn } from '@/lib/cn';
-import { AdminPageHeader, ClassSelect, StatusBadge, useCan, ReadOnlyNote } from './adminShared';
+import { AdminPageHeader, ClassSelect, StatusBadge, useCan, ReadOnlyNote, ADMIN_CAPS } from './adminShared';
 
-const STATUSES = ['DRAFT', 'PUBLISHED', 'RETIRED'];
+// Live backend: chapters/topics are simply active (PUBLISHED) or inactive (DRAFT).
+const STATUSES = ADMIN_CAPS?.curriculumStatuses || ['DRAFT', 'PUBLISHED', 'RETIRED'];
 
 function InlineName({ value, onSave, disabled }) {
   const [edit, setEdit] = useState(false);
@@ -48,6 +49,13 @@ export default function CurriculumPage() {
   const [open, setOpen] = useState(null);
   const [adding, setAdding] = useState(null); // { type: 'chapter' } | { type: 'topic', chapterId }
   const [newName, setNewName] = useState('');
+  const [removing, setRemoving] = useState(null); // { type: 'chapter' | 'topic', id, name }
+
+  const remove = () => act(async () => {
+    const { type, id } = removing;
+    setRemoving(null);
+    await (type === 'chapter' ? adminApi.deleteChapter(id) : adminApi.deleteTopic(id));
+  }, 'Deleted.');
 
   const act = async (fn, msg) => {
     try { await fn(); if (msg) toast.success(msg); refetch(); } catch (e) { toast.error(errorMessage(e)); }
@@ -76,10 +84,11 @@ export default function CurriculumPage() {
       {!canEdit && <ReadOnlyNote />}
       <div className="mb-5 flex flex-wrap items-end gap-3">
         <ClassSelect value={classId} onChange={setClassId} className="w-44" />
-        <p className="pb-3 text-sm text-ink-500">NCERT / CBSE · Mathematics</p>
+        <p className="pb-3 text-sm text-ink-500">NCERT / CBSE · Mathematics{data?.backendClassId && <> · class id <code className="text-xs">{data.backendClassId}</code></>}</p>
       </div>
       {loading && !data ? <PageSkeleton rows={2} /> : !data ? <ErrorState error={error} onRetry={refetch} /> : (
         <div className="space-y-2">
+          {data.chapters.length === 0 && <Card className="py-10 text-center text-sm text-ink-500">{data.backendClassId === null ? `Class ${classId} has not been created in the backend yet.` : 'No chapters yet. Add the first one.'}</Card>}
           {data.chapters.map((ch, i) => (
             <Card key={ch.id} padded={false} className="overflow-hidden">
               <div className="flex flex-wrap items-center gap-2 p-3 sm:px-4">
@@ -89,9 +98,11 @@ export default function CurriculumPage() {
                 </div>
                 <span className="w-8 text-center font-display font-bold text-ink-400">{i + 1}</span>
                 <div className="min-w-0 flex-1"><InlineName value={ch.name} disabled={!canEdit} onSave={(name) => act(() => adminApi.updateChapter(ch.id, { name }), 'Renamed.')} /></div>
+                {ADMIN_CAPS && <code className="hidden text-[11px] text-ink-400 md:inline">{ch.id}</code>}
                 <span className="text-xs text-ink-500">{ch.topics.length} topics</span>
                 <StatusBadge status={ch.status} />
                 {canEdit && <StatusSelect value={ch.status} onChange={(status) => act(() => adminApi.updateChapter(ch.id, { status }), `Chapter ${status.toLowerCase()}.`)} />}
+                {canEdit && adminApi.deleteChapter && <button type="button" onClick={() => setRemoving({ type: 'chapter', id: ch.id, name: ch.name })} className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-400 hover:bg-rose-50 hover:text-rose-600" aria-label={`Delete ${ch.name}`}><Trash2 className="h-4 w-4" /></button>}
                 <button type="button" onClick={() => setOpen(open === ch.id ? null : ch.id)} className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-ink-100" aria-label="Show topics" aria-expanded={open === ch.id}><ChevronDown className={cn('h-5 w-5 transition', open === ch.id && 'rotate-180')} /></button>
               </div>
               {open === ch.id && (
@@ -106,6 +117,7 @@ export default function CurriculumPage() {
                       <code className="hidden text-[11px] text-ink-400 md:inline">{t.id}</code>
                       <StatusBadge status={t.status} />
                       {canEdit && <StatusSelect value={t.status} onChange={(status) => act(() => adminApi.updateTopic(t.id, { status }), `Topic ${status.toLowerCase()}.`)} />}
+                      {canEdit && adminApi.deleteTopic && <button type="button" onClick={() => setRemoving({ type: 'topic', id: t.id, name: t.name })} className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-400 hover:bg-rose-50 hover:text-rose-600" aria-label={`Delete ${t.name}`}><Trash2 className="h-4 w-4" /></button>}
                     </div>
                   ))}
                   {canEdit && <Button size="sm" variant="ghost" leftIcon={Plus} onClick={() => setAdding({ type: 'topic', chapterId: ch.id })}>Add topic</Button>}
@@ -115,6 +127,9 @@ export default function CurriculumPage() {
           ))}
         </div>
       )}
+      <ConfirmDialog open={Boolean(removing)} onClose={() => setRemoving(null)} onConfirm={remove} tone="danger" title={`Delete “${removing?.name}”?`}
+        description={removing?.type === 'chapter' ? 'Only a chapter with no topics can be deleted. To hide it from students instead, set it to DRAFT.' : 'Only a topic with no study material can be deleted. To hide it from students instead, set it to DRAFT.'} confirmLabel="Delete"
+      />
       <Modal open={Boolean(adding)} onClose={() => setAdding(null)} title={adding?.type === 'chapter' ? `New chapter · Class ${classId}` : 'New topic'} description="New items start as drafts and are hidden from students until published."
         footer={<><Button variant="outline" onClick={() => setAdding(null)}>Cancel</Button><Button disabled={newName.trim().length < 3} onClick={create}>Create</Button></>}
       >

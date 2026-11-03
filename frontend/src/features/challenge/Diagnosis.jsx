@@ -15,7 +15,7 @@ export function DiagnosisList({ items }) {
         <span>Topic</span><span className="w-14 text-right">Accuracy</span><span className="w-28 text-right sm:w-32">Status</span>
       </div>
       {items.map((d) => {
-        const s = STATUS[d.status];
+        const s = STATUS[d.status] || STATUS.PARTIAL;
         return (
           <Link key={d.topicId} to={`/learn/topic/${d.topicId}`} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 border-t border-ink-100 px-4 py-3 transition hover:bg-ink-50">
             <span className="min-w-0">

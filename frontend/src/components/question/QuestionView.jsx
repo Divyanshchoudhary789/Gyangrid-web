@@ -5,7 +5,7 @@ import { cn } from '@/lib/cn';
 import { MathText } from '@/components/math/MathText';
 import { Button, DifficultyBadge, Modal, TextArea, ChoiceCard } from '@/components/ui';
 import { accountApi } from '@/services/api/student';
-import { errorMessage } from '@/services/errors';
+import { ERROR_CODES, errorMessage } from '@/services/errors';
 
 /* ------------------------------------------------------------------ option button */
 function OptionButton({ option, selected, state, disabled, onSelect }) {
@@ -30,12 +30,13 @@ function OptionButton({ option, selected, state, disabled, onSelect }) {
       <span
         className={cn(
           'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold transition',
-          !state && selected ? 'bg-brand-600 text-white' : 'bg-ink-100 text-ink-600 group-hover:bg-brand-100 group-hover:text-brand-700',
-          state === 'correct' && 'bg-emerald-500 text-white',
-          state === 'wrong' && 'bg-rose-500 text-white',
+          state === 'correct' ? 'bg-emerald-500 text-white'
+            : state === 'wrong' ? 'bg-rose-500 text-white'
+              : state ? 'bg-ink-100 text-ink-600'
+                : selected ? 'bg-brand-600 text-white' : 'bg-ink-100 text-ink-600 group-hover:bg-brand-100 group-hover:text-brand-700',
         )}
       >
-        {state === 'correct' ? <Check className="h-5 w-5" /> : state === 'wrong' ? <X className="h-5 w-5" /> : option.key}
+        {state === 'correct' ? <Check className="h-5 w-5" /> : state === 'wrong' ? <X className="h-5 w-5" /> : /^[A-H]$/.test(option.key) ? option.key : <span className="h-3 w-3 rounded-full border-2 border-current" aria-hidden />}
       </span>
       <MathText text={option.text} className="text-[15.5px] font-medium text-ink-800" />
     </button>
@@ -98,6 +99,39 @@ export function NumericAnswer({ value, onChange, disabled, state, onSubmit, auto
   );
 }
 
+/* ------------------------------------------------------------------ short (free-text) answer */
+export function TextAnswer({ value, onChange, disabled, state, onSubmit, autoFocus }) {
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        autoComplete="off"
+        autoCapitalize="off"
+        spellCheck={false}
+        autoFocus={autoFocus && finePointer()}
+        aria-label="Your answer"
+        value={value}
+        disabled={disabled}
+        maxLength={100}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && value.trim() && onSubmit) onSubmit(); }}
+        placeholder="Type your answer, e.g. 12 or 1/2"
+        className={cn(
+          'input h-14 pr-12 font-display text-xl font-semibold',
+          state === 'correct' && 'border-emerald-500 bg-emerald-50 text-emerald-800',
+          state === 'wrong' && 'border-rose-400 bg-rose-50 text-rose-800',
+        )}
+      />
+      {state && (
+        <span className={cn('absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-white', state === 'correct' ? 'bg-emerald-500' : 'bg-rose-500')}>
+          {state === 'correct' ? <Check className="h-5 w-5" /> : <X className="h-5 w-5" />}
+        </span>
+      )}
+      {!state && <p className="mt-2 text-xs text-ink-400">Write just the final answer. Press Enter to check.</p>}
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ question */
 /**
  * Renders one question. With `reveal` (the graded payload from the server), options/inputs show
@@ -141,6 +175,8 @@ export function QuestionView({ question, value, onChange, disabled, reveal, onSu
               <OptionButton key={o.key} option={o} selected={value === o.key} state={optionState(o.key)} disabled={locked} onSelect={onChange} />
             ))}
           </div>
+        ) : question.type === 'SHORT_ANSWER' ? (
+          <TextAnswer value={value || ''} onChange={onChange} disabled={locked} onSubmit={onSubmit} autoFocus={autoFocus} state={reveal ? (reveal.correct ? 'correct' : 'wrong') : undefined} />
         ) : (
           <NumericAnswer value={value || ''} onChange={onChange} disabled={locked} onSubmit={onSubmit} autoFocus={autoFocus} state={reveal ? (reveal.correct ? 'correct' : 'wrong') : undefined} />
         )}
@@ -164,25 +200,29 @@ export function SolutionPanel({ result, compact }) {
           </p>
           {!result.correct && (
             <p className="mt-1">
-              {!result.skipped && <>Your answer: <MathText text={result.yourAnswerLabel} className="font-semibold" /> · </>}
-              Correct answer: <MathText text={result.correctAnswerLabel} className="font-semibold" />
+              {!result.skipped && <>Your answer: <MathText text={result.yourAnswerLabel} className="font-semibold" />{result.correctAnswerLabel ? ' · ' : ''}</>}
+              {result.correctAnswerLabel && <>Correct answer: <MathText text={result.correctAnswerLabel} className="font-semibold" /></>}
             </p>
           )}
           {!result.correct && !result.skipped && result.mistakeSaved !== false && <p className="mt-1 text-xs opacity-80">Saved to your Mistake Bank so you can review it later.</p>}
         </div>
       </div>
 
-      <div className="rounded-2xl border border-ink-100 bg-white p-4 sm:p-5">
-        <p className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-900"><ListOrdered className="h-4 w-4 text-brand-500" /> Step-by-step solution</p>
-        <ol className="space-y-2.5">
-          {result.explanation?.map((s, i) => (
-            <li key={i} className="flex gap-3 text-[15px] text-ink-700">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">{i + 1}</span>
-              <MathText text={s} />
-            </li>
-          ))}
-        </ol>
-      </div>
+      {result.explanation?.length > 0 && (
+        <div className="rounded-2xl border border-ink-100 bg-white p-4 sm:p-5">
+          <p className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-900"><ListOrdered className="h-4 w-4 text-brand-500" /> {result.explanation.length > 1 ? 'Step-by-step solution' : 'Solution'}</p>
+          {result.explanation.length > 1 ? (
+            <ol className="space-y-2.5">
+              {result.explanation.map((s, i) => (
+                <li key={i} className="flex gap-3 text-[15px] text-ink-700">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">{i + 1}</span>
+                  <MathText text={s} />
+                </li>
+              ))}
+            </ol>
+          ) : <MathText as="p" text={result.explanation[0]} className="text-[15px] leading-relaxed text-ink-700" />}
+        </div>
+      )}
       {result.conceptNote && (
         <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
           <Lightbulb className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" aria-hidden />
@@ -198,9 +238,16 @@ const REASONS = [
   { value: 'WRONG_ANSWER', label: 'The answer seems wrong', emoji: '❌' },
   { value: 'UNCLEAR', label: 'The question is unclear', emoji: '🤔' },
   { value: 'NOT_IN_SYLLABUS', label: 'Not in my syllabus', emoji: '📚' },
+  { value: 'OTHER', label: 'Something else', emoji: '💬' },
 ];
 
-export function ReportQuestionButton({ questionId, className }) {
+export function ReportQuestionButton(props) {
+  // Hidden until the backend exposes a report endpoint (see docs/PENDING_BACKEND_APIS.md).
+  if (accountApi.canReportQuestion === false) return null;
+  return <ReportQuestionDialog {...props} />;
+}
+
+function ReportQuestionDialog({ questionId, className }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [note, setNote] = useState('');
@@ -214,7 +261,10 @@ export function ReportQuestionButton({ questionId, className }) {
       setReason('');
       setNote('');
     } catch (e) {
-      toast.error(errorMessage(e));
+      if (e.code === ERROR_CODES.CONFLICT) { // already reported: nothing more for the student to do
+        toast.info(errorMessage(e));
+        setOpen(false);
+      } else toast.error(errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -238,7 +288,7 @@ export function ReportQuestionButton({ questionId, className }) {
             </ChoiceCard>
           ))}
         </div>
-        <TextArea className="mt-4" label="Anything else? (optional)" value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} placeholder="Please don't include personal details." />
+        <TextArea className="mt-4" label="Anything else? (optional)" value={note} onChange={(e) => setNote(e.target.value)} maxLength={1000} placeholder="Please don't include personal details." />
       </Modal>
     </>
   );

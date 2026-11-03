@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, Info, XCircle, LoaderCircle, RefreshCw, SearchX } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { AVATARS } from '@/config/constants';
+import { ALL_AVATARS, DEFAULT_AVATAR_ID } from '@/config/constants';
 import { Button } from './Button';
 
 /* ------------------------------------------------------------------ Card */
@@ -167,7 +167,7 @@ export const masteryColor = (m) => (m == null ? '#c1c7d8' : m >= 75 ? '#10b981' 
 
 /* ------------------------------------------------------------------ Avatar */
 export function Avatar({ id, size = 'md', className, ring }) {
-  const a = AVATARS.find((x) => x.id === id) || AVATARS[1];
+  const a = ALL_AVATARS.find((x) => x.id === id) || ALL_AVATARS.find((x) => x.id === DEFAULT_AVATAR_ID);
   const dims = { xs: 'h-7 w-7 text-base', sm: 'h-9 w-9 text-lg', md: 'h-11 w-11 text-2xl', lg: 'h-16 w-16 text-4xl', xl: 'h-24 w-24 text-6xl' }[size];
   return (
     <span className={cn('inline-flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br', a.bg, dims, ring && 'ring-4 ring-white', className)} aria-hidden>

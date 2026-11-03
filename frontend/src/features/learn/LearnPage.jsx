@@ -6,8 +6,9 @@ import { PageHeader, ProgressRing, masteryColor, PageSkeleton, ErrorState, Empty
 import { useQuery } from '@/hooks/useQuery';
 import { learnApi } from '@/services/api/student';
 import { useDocumentTitle } from '@/hooks/useCommon';
-import { masteryBand } from '@/lib/format';
+import { masteryBand, plural } from '@/lib/format';
 import { useAuthStore } from '@/store/authStore';
+import { classLabel, boardLabel } from '@/features/shared/userDisplay';
 
 export default function LearnPage() {
   useDocumentTitle('Learn');
@@ -33,7 +34,7 @@ export default function LearnPage() {
   return (
     <div>
       <PageHeader
-        eyebrow={`Class ${data.classId} · NCERT / CBSE`}
+        eyebrow={`${classLabel(user)} · ${boardLabel(user)}`}
         title="Learn"
         subtitle={`${data.chapters.length} chapters · ${totalTopics} topics · ${studied} studied so far`}
       />
@@ -52,7 +53,8 @@ export default function LearnPage() {
                   </ProgressRing>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-bold text-ink-900">{ch.name}</p>
-                    <p className="mt-0.5 text-sm text-ink-500">{ch.topicCount} topics · {ch.questionCount} questions</p>
+                    <p className="mt-0.5 text-sm text-ink-500">{plural(ch.topicCount, 'topic')}{ch.questionCount != null ? ` · ${plural(ch.questionCount, 'question')}` : ''}</p>
+                    {ch.description && <p className="mt-0.5 line-clamp-1 text-xs text-ink-400">{ch.description}</p>}
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       <Badge tone={band.tone === 'neutral' ? 'neutral' : band.tone}>{ch.mastery != null ? `${band.label} · ${ch.mastery}` : 'Not started'}</Badge>
                       {ch.studiedCount > 0 && <Badge tone="info" icon={CheckCircle2}>{ch.studiedCount}/{ch.topicCount} studied</Badge>}

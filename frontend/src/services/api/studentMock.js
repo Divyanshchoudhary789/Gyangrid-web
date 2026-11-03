@@ -19,6 +19,14 @@ export const authApi = {
 
 export const homeApi = { get: () => http.get('/home') };
 
+/** Mock curriculum lookup used by onboarding (the mock identifies classes by grade). */
+export const curriculumApi = {
+  boardsWithClasses: async () => [{
+    _id: 'NCERT_CBSE', code: 'CBSE', name: 'NCERT / CBSE',
+    classes: [6, 7, 8, 9, 10].map((g) => ({ _id: g, grade: g, name: `Class ${g}` })),
+  }],
+};
+
 export const learnApi = {
   curriculum: () => http.get('/curriculum'),
   topic: (topicId) => http.get(`/topics/${enc(topicId)}`),

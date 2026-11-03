@@ -6,6 +6,7 @@ import { testApi } from '@/services/api/student';
 import { useDocumentTitle } from '@/hooks/useCommon';
 import { humanDuration } from '@/lib/date';
 import { cn } from '@/lib/cn';
+import { plural } from '@/lib/format';
 
 /** Series progress: completed, average, strongest and weakest chapter (F6-12). */
 export default function SeriesPage() {
@@ -39,7 +40,7 @@ export default function SeriesPage() {
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold uppercase tracking-wide text-ink-400">Test {t.order}</p>
                 <p className="font-bold text-ink-900">{t.title}</p>
-                <p className="mt-1 flex flex-wrap gap-3 text-xs text-ink-500"><span>{t.questionCount} questions</span><span className="flex items-center gap-1"><Clock className="h-3 w-3" />{humanDuration(t.durationSec)}</span><span>{t.totalMarks} marks</span></p>
+                <p className="mt-1 flex flex-wrap gap-3 text-xs text-ink-500"><span>{plural(t.questionCount, 'question')}</span><span className="flex items-center gap-1"><Clock className="h-3 w-3" />{humanDuration(t.durationSec)}</span><span>{t.totalMarks} marks</span></p>
               </div>
               {done ? <Badge tone="success">{t.firstAttempt.scorePct}%</Badge> : locked ? <Badge>Locked</Badge> : t.status === 'IN_PROGRESS' ? <Badge tone="warning">Resume</Badge> : <Badge tone="brand">Start</Badge>}
             </div>

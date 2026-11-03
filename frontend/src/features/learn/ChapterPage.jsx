@@ -5,7 +5,7 @@ import { PageHeader, Card, Button, ProgressBar, ProgressRing, masteryColor, Page
 import { useQuery } from '@/hooks/useQuery';
 import { learnApi } from '@/services/api/student';
 import { useDocumentTitle } from '@/hooks/useCommon';
-import { masteryBand } from '@/lib/format';
+import { masteryBand, plural } from '@/lib/format';
 import { useAuthStore } from '@/store/authStore';
 import { PracticeSetupModal } from '@/features/practice/PracticeSetupModal';
 
@@ -28,7 +28,7 @@ export default function ChapterPage() {
         back={{ to: '/learn', label: 'All chapters' }}
         eyebrow={`Chapter ${chapter.number}`}
         title={chapter.name}
-        subtitle={`${chapter.topicCount} topics · ${chapter.questionCount} questions`}
+        subtitle={chapter.description || `${plural(chapter.topicCount, 'topic')}${chapter.questionCount != null ? ` · ${plural(chapter.questionCount, 'question')}` : ''}`}
         action={(
           <>
             <Button variant="outline" leftIcon={Timer} to="/tests">Chapter test</Button>
@@ -65,7 +65,7 @@ export default function ChapterPage() {
                   <span className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-500">
                     <Badge tone={b.tone}>{t.mastery != null ? `${b.label} · ${t.mastery}` : t.attempts ? `${t.attempts} attempts` : 'Not started'}</Badge>
                     {t.accuracy != null && <span>{t.accuracy}% accuracy</span>}
-                    <span>{t.questionCount} questions</span>
+                    {t.questionCount != null && <span>{plural(t.questionCount, 'question')}</span>}
                   </span>
                 </span>
               </Link>

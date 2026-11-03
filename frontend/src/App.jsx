@@ -5,6 +5,7 @@ import { ErrorBoundary, OfflineBanner, CelebrationLayer } from '@/components/fee
 import { StudentLayout, FocusLayout } from '@/components/layout/StudentLayout';
 import { RequireAuth, RequireOnboarded, RequireNotOnboarded, PublicOnly, RequireAdmin } from '@/routes/guards';
 import { PageSkeleton } from '@/components/ui';
+import { AuthBootstrap } from '@/features/auth/AuthBootstrap';
 
 // Route-level code splitting keeps the first paint small (NFR-01)
 const Landing = lazy(() => import('@/features/public/LandingPage'));
@@ -39,6 +40,7 @@ const Profile = lazy(() => import('@/features/profile/ProfilePage'));
 const Settings = lazy(() => import('@/features/profile/SettingsPage'));
 const ParentReport = lazy(() => import('@/features/profile/ParentReportPage'));
 
+const ParentReportView = lazy(() => import('@/features/profile/ParentReportViewPage'));
 const AdminLogin = lazy(() => import('@/features/admin/AdminLoginPage'));
 const AdminLayout = lazy(() => import('@/features/admin/AdminLayout'));
 const AdminDashboard = lazy(() => import('@/features/admin/DashboardPage'));
@@ -58,9 +60,11 @@ function Root() {
   return (
     <ErrorBoundary>
       <OfflineBanner />
-      <Suspense fallback={<div className="mx-auto max-w-5xl p-6"><PageSkeleton /></div>}>
-        <Outlet />
-      </Suspense>
+      <AuthBootstrap>
+        <Suspense fallback={<div className="mx-auto max-w-5xl p-6"><PageSkeleton /></div>}>
+          <Outlet />
+        </Suspense>
+      </AuthBootstrap>
       <CelebrationLayer />
       <Toaster position="top-center" richColors closeButton toastOptions={{ className: 'font-sans' }} />
       <ScrollRestoration />
@@ -75,6 +79,8 @@ const router = createBrowserRouter([
       { path: '/', element: <Landing /> },
       { path: '/privacy', element: <Privacy /> },
       { path: '/terms', element: <Terms /> },
+      { path: '/parent-report/view', element: <ParentReportView /> },
+      { path: '/parent-report', element: <ParentReportView /> },
       {
         element: <PublicOnly />,
         children: [

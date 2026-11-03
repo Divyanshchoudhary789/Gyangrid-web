@@ -18,6 +18,8 @@ import { track } from '@/lib/analytics';
 import { cn } from '@/lib/cn';
 import { refreshSummary } from '@/features/shared/useHome';
 import { StagedProgress } from './DoubtsPage';
+import { ComingSoon } from '@/components/feedback/ComingSoon';
+import { DoubtChat } from './DoubtChat';
 
 const reveal = (i, fresh) => (fresh ? { initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, transition: { delay: 0.15 + i * 0.35, duration: 0.35 } } : {});
 
@@ -65,7 +67,7 @@ function FollowUp({ question, onAnswer, busy, disabled }) {
   );
 }
 
-export default function DoubtSessionPage() {
+function DoubtSessionPageFull() {
   const { doubtId } = useParams();
   const location = useLocation();
   const online = useOnline();
@@ -221,4 +223,21 @@ export default function DoubtSessionPage() {
       </Modal>
     </div>
   );
+}
+
+/** Shown until the backend exposes this feature (see docs/PENDING_BACKEND_APIS.md). */
+export default function DoubtSessionPage() {
+  if (doubtApi.available === false) {
+    return (
+      <ComingSoon
+        title="Ask a doubt"
+        subtitle="Your AI Maths tutor explains step by step — then checks that you’ve got it."
+        emoji="💡"
+        points={['Type your question with a maths keypad', 'Snap a photo of a printed or handwritten problem', 'Ask out loud with your voice', 'Step-by-step help with a quick check']}
+        primary={{ to: '/practice', label: 'Practise instead' }}
+        secondary={{ to: '/mistakes', label: 'Open Mistake Bank' }}
+      />
+    );
+  }
+  return doubtApi.chat ? <DoubtChat /> : <DoubtSessionPageFull />;
 }

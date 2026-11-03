@@ -5,10 +5,11 @@ import { PageHeader, Tabs, Card, Avatar, PageSkeleton, ErrorState, Modal } from 
 import { useQuery } from '@/hooks/useQuery';
 import { progressApi } from '@/services/api/student';
 import { useDocumentTitle } from '@/hooks/useCommon';
-import { formatNumber } from '@/lib/format';
+import { formatNumber, plural } from '@/lib/format';
 import { timeAgo, formatDateTime } from '@/lib/date';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/store/authStore';
+import { classLabel } from '@/features/shared/userDisplay';
 
 const PODIUM = [
   { place: 2, h: 'h-20', cls: 'from-slate-200 to-slate-300', medal: '🥈' },
@@ -28,7 +29,7 @@ export default function LeaderboardPage() {
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title="Leaderboard"
-        subtitle={`Class ${user?.profile?.classId} · ranked by XP earned from real learning`}
+        subtitle={`${classLabel(user)} · ranked by XP earned from real learning`}
         action={<button type="button" onClick={() => setRulesOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold text-ink-500 hover:bg-ink-100"><Info className="h-4 w-4" />How ranking works</button>}
       />
       <Tabs className="mb-6" value={period} onChange={setPeriod} tabs={[{ value: 'WEEKLY', label: 'This week' }, { value: 'ALL_TIME', label: 'All time' }]} />
@@ -74,8 +75,8 @@ export default function LeaderboardPage() {
           </Card>
           <p className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-ink-400">
             <span className="flex items-center gap-1"><RefreshCw className="h-3 w-3" />Updated {timeAgo(data.updatedAt)}</span>
-            {period === 'WEEKLY' && <span>Resets {formatDateTime(data.resetsAt)}</span>}
-            <span>{data.totalStudents} students in your class</span>
+            {period === 'WEEKLY' && <span>{data.resetsAt ? `Resets ${formatDateTime(data.resetsAt)}` : 'Resets every Monday'}</span>}
+            <span>{plural(data.totalStudents, 'student')} in your class</span>
           </p>
         </>
       )}

@@ -1,23 +1,27 @@
 import { env } from '@/config/env';
-import { ApiError, ERROR_CODES } from './errors';
+import { ApiError, ERROR_CODES, mapBackendError } from './errors';
 
 /**
  * Single HTTP entry point for the whole app.
- * - Real mode: fetch against VITE_API_BASE_URL with the bearer token, timeout and the common envelope.
- * - Mock mode: the same call is routed to the in-browser mock server (lazy-loaded, so it never
- *   ships in a production bundle built with VITE_USE_MOCK_API=false).
+ * - Real mode: fetch against VITE_API_BASE_URL with a fresh Firebase ID token, timeout, one safe retry
+ *   for idempotent reads, and the backend envelope { success, message, data } / { success:false, message, errorCode }.
+ * - Mock mode (VITE_USE_MOCK_API=true, local demo only): routed to the in-browser mock server, which is
+ *   lazy-loaded and dropped from production bundles built with VITE_USE_MOCK_API=false.
  */
-let tokenProvider = () => null;
+let tokenProvider = async () => null;
 let unauthorizedHandler = () => {};
 
 export const setTokenProvider = (fn) => { tokenProvider = fn; };
 export const setUnauthorizedHandler = (fn) => { unauthorizedHandler = fn; };
 
-const DEFAULT_TIMEOUT = 20000;
-const AI_TIMEOUT = 30000; // NFR-02 hard timeout
+// The API is hosted on a platform that can cold-start in ~30–60 s, so timeouts are generous.
+const DEFAULT_TIMEOUT = 60000;
+const AI_TIMEOUT = 90000;
 
-// Compared as a literal so the bundler can drop the whole mock layer when VITE_USE_MOCK_API=false.
-const MOCK_ENABLED = import.meta.env.VITE_USE_MOCK_API !== 'false';
+// Compared as a literal so the bundler can drop the whole mock layer when VITE_USE_MOCK_API is not 'true'.
+const MOCK_ENABLED = import.meta.env.VITE_USE_MOCK_API === 'true';
+export const isMockMode = () => MOCK_ENABLED && env.useMockApi;
+
 let mockServerPromise = null;
 const loadMock = () => {
   if (!MOCK_ENABLED) return Promise.reject(new ApiError(ERROR_CODES.SERVER, 'Mock API is disabled.'));
@@ -37,46 +41,84 @@ async function viaMock(method, path, body, token) {
   return res.data;
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 async function viaFetch(method, path, body, token, { timeout, signal }) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
-  signal?.addEventListener('abort', () => controller.abort());
+  const onAbort = () => controller.abort();
+  signal?.addEventListener('abort', onAbort);
   let res;
+  const hasBody = body != null && method !== 'GET';
+  const isForm = typeof FormData !== 'undefined' && body instanceof FormData; // multipart: the browser sets the boundary
   try {
     res = await fetch(`${env.apiBaseUrl}${path}`, {
       method,
       headers: {
-        'Content-Type': 'application/json',
         Accept: 'application/json',
+        ...(hasBody && !isForm ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: body != null && method !== 'GET' ? JSON.stringify(body) : undefined,
+      body: hasBody ? (isForm ? body : JSON.stringify(body)) : undefined,
       signal: controller.signal,
-      credentials: 'include',
     });
   } catch (e) {
-    if (e.name === 'AbortError') throw new ApiError(ERROR_CODES.TIMEOUT, undefined, { status: 0 });
+    if (e.name === 'AbortError') {
+      if (signal?.aborted) throw e;
+      throw new ApiError(ERROR_CODES.TIMEOUT, undefined, { status: 0 });
+    }
     throw new ApiError(ERROR_CODES.NETWORK, undefined, { status: 0 });
   } finally {
     clearTimeout(timer);
+    signal?.removeEventListener('abort', onAbort);
   }
   let json = null;
-  try { json = await res.json(); } catch { /* non-JSON body */ }
-  if (!res.ok || !json?.ok) {
-    const code = json?.error?.code || (res.status === 401 ? ERROR_CODES.UNAUTHENTICATED : ERROR_CODES.SERVER);
-    throw new ApiError(code, json?.error?.message, { status: res.status, details: json?.error?.details });
-  }
-  return json.data;
+  try { json = await res.json(); } catch { /* empty or non-JSON body */ }
+  if (!res.ok || json?.success === false) throw mapBackendError(res.status, json);
+  // Some endpoints may reply with an empty body (e.g. 204); normalise to null.
+  return json && 'data' in json ? json.data : json;
 }
 
+/**
+ * @param {object} opts
+ *  - scope: 'admin' | undefined
+ *  - auth: false → send no token (public endpoints)
+ *  - ai: longer timeout
+ *  - skipAuthRedirect: don't bounce to the sign-in page on 401
+ */
 export async function request(method, path, body, opts = {}) {
-  const token = opts.token ?? tokenProvider(opts.scope);
-  try {
-    if (MOCK_ENABLED && env.useMockApi) return await viaMock(method, path, body, token);
-    return await viaFetch(method, path, body, token, { timeout: opts.ai ? AI_TIMEOUT : DEFAULT_TIMEOUT, signal: opts.signal });
-  } catch (err) {
-    if (err instanceof ApiError && err.code === ERROR_CODES.UNAUTHENTICATED && !opts.skipAuthRedirect) unauthorizedHandler(opts.scope);
-    throw err;
+  if (isMockMode()) {
+    const token = opts.token ?? (await tokenProvider(opts.scope));
+    try {
+      return await viaMock(method, path, body, token);
+    } catch (err) {
+      if (err instanceof ApiError && err.code === ERROR_CODES.UNAUTHENTICATED && !opts.skipAuthRedirect) unauthorizedHandler(opts.scope);
+      throw err;
+    }
+  }
+
+  const timeout = opts.ai ? AI_TIMEOUT : DEFAULT_TIMEOUT;
+  const getToken = (force) => (opts.auth === false ? null : opts.token ?? tokenProvider(opts.scope, force));
+  const canRetry = method === 'GET';
+  let token = await getToken(false);
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await viaFetch(method, path, body, token, { timeout, signal: opts.signal });
+    } catch (err) {
+      if (!(err instanceof ApiError)) throw err;
+      // An expired ID token: refresh once and retry the same request.
+      if (err.status === 401 && token && attempt === 0 && opts.auth !== false) {
+        token = await getToken(true);
+        continue;
+      }
+      // Transient failures on idempotent reads get one more try.
+      if (canRetry && attempt === 0 && (err.code === ERROR_CODES.NETWORK || err.status >= 502)) {
+        await sleep(800);
+        continue;
+      }
+      if (err.code === ERROR_CODES.UNAUTHENTICATED && !opts.skipAuthRedirect) unauthorizedHandler(opts.scope);
+      throw err;
+    }
   }
 }
 
@@ -91,5 +133,5 @@ export const http = {
   post: (path, body, opts) => request('POST', path, body ?? {}, opts),
   put: (path, body, opts) => request('PUT', path, body ?? {}, opts),
   patch: (path, body, opts) => request('PATCH', path, body ?? {}, opts),
-  del: (path, body, opts) => request('DELETE', path, body ?? {}, opts),
+  del: (path, body, opts) => request('DELETE', path, body ?? undefined, opts),
 };

@@ -8,11 +8,16 @@ import { errorMessage } from '@/services/errors';
 import { useDocumentTitle } from '@/hooks/useCommon';
 import { AdminPageHeader, AdminTable } from './adminShared';
 
-const COLUMNS = ['topicId', 'type', 'difficulty', 'questionText', 'optionA', 'optionB', 'optionC', 'optionD', 'correctAnswer', 'answerTolerance', 'explanation', 'conceptNote'];
-const TEMPLATE = `${COLUMNS.join(',')}
+const MOCK_COLUMNS = ['topicId', 'type', 'difficulty', 'questionText', 'optionA', 'optionB', 'optionC', 'optionD', 'correctAnswer', 'answerTolerance', 'explanation', 'conceptNote'];
+const MOCK_TEMPLATE = `${MOCK_COLUMNS.join(',')}
 c8_ch02_t1,NUMERIC,EASY,"Solve for $x$: $3x + 4 = 19$",,,,,5,0,"Subtract 4 from both sides: $3x = 15$|Divide by 3: $x = 5$","Keep the equation balanced."
 c8_ch05_t2,MCQ_SINGLE,MEDIUM,"Find $\\sqrt{196}$",12,14,16,18,B,0,"$14 \\times 14 = 196$|So $\\sqrt{196} = 14$",
 c8_ch05_t2,MCQ_SINGLE,HARD,"This row has no explanation",1,2,3,4,A,0,,`;
+
+// The live backend needs class / chapter / topic ids and its own question types, so it supplies its own spec.
+const SPEC = adminApi.importSpec || { columns: MOCK_COLUMNS, template: MOCK_TEMPLATE, note: null };
+const COLUMNS = SPEC.columns;
+const TEMPLATE = SPEC.template;
 
 /** RFC-4180-ish CSV parser (quotes, escaped quotes, commas and newlines inside quotes). */
 function parseCsv(text) {
@@ -72,7 +77,7 @@ export default function ImportPage() {
     setBusy(true);
     try {
       const res = await adminApi.commitImport(rows);
-      toast.success(`${res.imported} questions imported to the review queue. ${res.rejected} rejected.`);
+      toast.success(`${res.imported} questions imported${adminApi.importSpec ? ' as drafts' : ' to the review queue'}. ${res.rejected} rejected.`);
       navigate('/admin/questions');
     } catch (e) { toast.error(errorMessage(e)); } finally { setBusy(false); }
   };
@@ -83,7 +88,8 @@ export default function ImportPage() {
   return (
     <div>
       <button type="button" onClick={() => navigate('/admin/questions')} className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-ink-500 hover:text-brand-600"><ArrowLeft className="h-4 w-4" />Question bank</button>
-      <AdminPageHeader title="Bulk import questions" subtitle="Upload a CSV. We validate every row before anything is saved. Imported questions go to the review queue." action={<Button variant="outline" leftIcon={Download} onClick={downloadTemplate}>Download template</Button>} />
+      <AdminPageHeader title="Bulk import questions" subtitle={adminApi.importSpec ? 'Upload a CSV. Every row is validated before anything is saved. Imported questions are saved as drafts — publish them from the question bank.' : 'Upload a CSV. We validate every row before anything is saved. Imported questions go to the review queue.'} action={<Button variant="outline" leftIcon={Download} onClick={downloadTemplate}>Download template</Button>} />
+      {SPEC.note && <Alert tone="info" className="mb-4">{SPEC.note}</Alert>}
       <Card className="mb-5">
         <button type="button" onClick={() => fileRef.current?.click()} className="flex w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-ink-200 py-10 text-ink-500 transition hover:border-brand-300 hover:bg-brand-50/40">
           <FileSpreadsheet className="h-10 w-10 text-brand-500" />

@@ -2,6 +2,11 @@ import { useAdminStore } from '@/store/authStore';
 import { Badge, SelectField } from '@/components/ui';
 import { CLASSES } from '@/config/constants';
 import { cn } from '@/lib/cn';
+import { adminApi } from '@/services/api/admin';
+
+/** Backend capability flags (real mode). In mock mode everything in the PRD is supported. */
+export const ADMIN_CAPS = adminApi.caps || null;
+export const supports = (key, fallback = true) => (ADMIN_CAPS ? ADMIN_CAPS[key] !== false && ADMIN_CAPS[key] != null : fallback);
 
 /** Client-side mirror of the admin permission matrix (3.1). The API enforces the same rules. */
 export const CAN = {
@@ -22,7 +27,7 @@ export function useCan(permission) {
 const STATUS_TONE = {
   PUBLISHED: 'success', APPROVED: 'success', INDEXED: 'success', RESOLVED: 'success', ACTIVE: 'success',
   DRAFT: 'neutral', IN_REVIEW: 'warning', INDEXING: 'info', OPEN: 'warning', SUSPENDED: 'danger',
-  RETIRED: 'danger', FAILED: 'danger', DELETION_PENDING: 'danger',
+  RETIRED: 'danger', FAILED: 'danger', DELETION_PENDING: 'danger', DEACTIVATED: 'danger', ARCHIVED: 'danger',
 };
 export const StatusBadge = ({ status }) => <Badge tone={STATUS_TONE[status] || 'neutral'}>{String(status).replace(/_/g, ' ')}</Badge>;
 

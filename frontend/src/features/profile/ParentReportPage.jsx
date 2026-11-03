@@ -4,9 +4,10 @@ import { Logo } from '@/components/brand/Logo';
 import { useQuery } from '@/hooks/useQuery';
 import { progressApi } from '@/services/api/student';
 import { useDocumentTitle } from '@/hooks/useCommon';
+import { LiveParentReport } from './LiveParentReport';
 
 /** F11-08: the student can see that a weekly report goes to their parent and exactly what it contains. */
-export default function ParentReportPage() {
+function ParentReportPageFull() {
   useDocumentTitle('Parent report');
   const { data: r, error, loading, refetch } = useQuery('parentReport', progressApi.parentReport);
   if (loading && !r) return <PageSkeleton rows={1} />;
@@ -89,4 +90,8 @@ export default function ParentReportPage() {
       <p className="flex items-center justify-center gap-1.5 text-xs text-ink-400"><CalendarClock className="h-3.5 w-3.5" />Your parent can unsubscribe at any time using the link in the email.</p>
     </div>
   );
+}
+
+export default function ParentReportPage() {
+  return progressApi.deliverParentReport ? <LiveParentReport /> : <ParentReportPageFull />;
 }

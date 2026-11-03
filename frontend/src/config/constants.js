@@ -11,7 +11,16 @@ export const BOARDS = [
 
 export const RELATIONSHIPS = ['Mother', 'Father', 'Guardian', 'Grandparent', 'Other'];
 
-export const AVATARS = [
+/** The avatar ids the backend accepts (PUT /profile/onboarding, PATCH /profile). */
+export const BUDDY_AVATARS = [
+  { id: 'buddy-blue', emoji: '🐳', bg: 'from-sky-300 to-blue-500' },
+  { id: 'buddy-green', emoji: '🐢', bg: 'from-emerald-300 to-green-500' },
+  { id: 'buddy-orange', emoji: '🦊', bg: 'from-orange-300 to-amber-500' },
+  { id: 'buddy-purple', emoji: '🦄', bg: 'from-fuchsia-300 to-purple-500' },
+  { id: 'buddy-yellow', emoji: '🐥', bg: 'from-yellow-200 to-amber-400' },
+];
+
+const LEGACY_AVATARS = [
   { id: 'fox', emoji: '🦊', bg: 'from-orange-300 to-amber-400' },
   { id: 'owl', emoji: '🦉', bg: 'from-violet-300 to-indigo-400' },
   { id: 'panda', emoji: '🐼', bg: 'from-slate-200 to-slate-400' },
@@ -25,6 +34,12 @@ export const AVATARS = [
   { id: 'koala', emoji: '🐨', bg: 'from-zinc-200 to-zinc-400' },
   { id: 'octopus', emoji: '🐙', bg: 'from-rose-300 to-red-400' },
 ];
+
+/** Avatars offered in the pickers: the backend's set in real mode, the demo set in mock mode. */
+export const AVATARS = import.meta.env.VITE_USE_MOCK_API === 'true' ? LEGACY_AVATARS : BUDDY_AVATARS;
+/** Every known avatar, so any stored id still renders (e.g. data created in mock mode). */
+export const ALL_AVATARS = [...BUDDY_AVATARS, ...LEGACY_AVATARS];
+export const DEFAULT_AVATAR_ID = AVATARS[0].id;
 
 export const MASTERY_BANDS = [
   { min: 75, label: 'Strong', key: 'STRONG', tone: 'success' },

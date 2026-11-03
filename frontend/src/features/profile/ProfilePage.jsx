@@ -6,8 +6,9 @@ import { useAuthStore } from '@/store/authStore';
 import { useHome } from '@/features/shared/useHome';
 import { useDocumentTitle } from '@/hooks/useCommon';
 import { formatDate } from '@/lib/date';
-import { formatNumber } from '@/lib/format';
+import { formatNumber, plural } from '@/lib/format';
 import { signOut } from '@/features/auth/session';
+import { classLabel, boardLabel } from '@/features/shared/userDisplay';
 import { AvatarPicker } from './AvatarPicker';
 
 const LINKS = [
@@ -47,7 +48,7 @@ export default function ProfilePage() {
             {[
               { icon: Zap, label: 'XP', value: s ? formatNumber(s.totalXp) : '—', cls: 'text-brand-600' },
               { icon: Coins, label: 'Gold Coins', value: s ? formatNumber(s.goldCoins) : '—', cls: 'text-gold-600' },
-              { icon: Flame, label: 'Streak', value: s ? `${s.currentStreak} days` : '—', cls: 'text-flame-600' },
+              { icon: Flame, label: 'Streak', value: s ? plural(s.currentStreak, 'day') : '—', cls: 'text-flame-600' },
               { icon: Trophy, label: 'Weekly rank', value: s?.rank?.classWeekly ? `#${s.rank.classWeekly}` : '—', cls: 'text-violet-600' },
             ].map((x) => (
               <div key={x.label} className="rounded-2xl bg-ink-50 p-3 text-center">
@@ -59,7 +60,7 @@ export default function ProfilePage() {
           </div>
           <dl className="mt-6 grid gap-3 text-sm sm:grid-cols-2">
             {[
-              { icon: GraduationCap, k: 'Class & board', v: `Class ${p?.classId} · NCERT / CBSE` },
+              { icon: GraduationCap, k: 'Class & board', v: `${classLabel(user)} · ${boardLabel(user)}` },
               { icon: CalendarDays, k: 'Joined', v: user?.createdAt ? formatDate(user.createdAt) : '—' },
               { icon: Mail, k: 'Email', v: user?.email },
               { icon: ShieldCheck, k: 'Parent / guardian', v: p?.parent ? `${p.parent.name} (${p.parent.relationship}) · ${p.parent.contactMasked}` : '—' },
@@ -71,7 +72,7 @@ export default function ProfilePage() {
             ))}
           </dl>
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            <Badge tone="success" icon={ShieldCheck}>Parental consent: active</Badge>
+            {p?.consent ? <Badge tone="success" icon={ShieldCheck}>Parental consent: active</Badge> : <Badge tone="warning" icon={ShieldCheck}>Parental consent: pending</Badge>}
             {p?.consent?.timestamp && <span className="text-xs text-ink-400">since {formatDate(p.consent.timestamp)}</span>}
           </div>
         </div>

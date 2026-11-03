@@ -1,15 +1,16 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, ArrowRight, ShieldCheck, Lock, Trash2, Eye, Mail, Check } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, ShieldCheck, Lock, Trash2, Eye, Mail, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { Logo } from '@/components/brand/Logo';
-import { Button, ChoiceCard, TextField, SelectField, Checkbox, Alert, ProgressBar, Avatar } from '@/components/ui';
-import { authApi } from '@/services/api/student';
+import { Button, ChoiceCard, TextField, SelectField, Checkbox, Alert, ProgressBar, Avatar, Skeleton } from '@/components/ui';
+import { authApi, curriculumApi } from '@/services/api/student';
+import { useQuery } from '@/hooks/useQuery';
 import { errorMessage } from '@/services/errors';
 import { useAuthStore } from '@/store/authStore';
 import { useCelebrationStore } from '@/store/celebrationStore';
-import { CLASSES, BOARDS, RELATIONSHIPS, AVATARS, CONSENT_TEXT_VERSION } from '@/config/constants';
+import { RELATIONSHIPS, AVATARS, DEFAULT_AVATAR_ID, CONSENT_TEXT_VERSION } from '@/config/constants';
 import { isEmail, isIndianMobile, isValidName } from '@/lib/validators';
 import { firstName } from '@/lib/format';
 import { useDocumentTitle } from '@/hooks/useCommon';
@@ -38,8 +39,17 @@ export default function OnboardingPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
-  const [classId, setClassId] = useState(user?.profile?.classId || null);
-  const [boardId, setBoardId] = useState(user?.profile?.boardId || 'NCERT_CBSE');
+  // Boards and their classes come from the live curriculum; a class id is board-specific.
+  const { data: boards, error: boardsError, refetch: refetchBoards } = useQuery('boardsWithClasses', curriculumApi.boardsWithClasses, { persist: true, staleMs: 3600000 });
+  const [grade, setGrade] = useState(user?.profile?.grade || null);
+  const [boardId, setBoardId] = useState(user?.profile?.boardId || null);
+  const effectiveBoardId = boardId || boards?.[0]?._id || null;
+  const grades = useMemo(() => {
+    const all = new Set((boards || []).flatMap((b) => (b.classes || []).map((c) => c.grade)).filter(Boolean));
+    return all.size ? [...all].sort((a, b) => a - b) : [];
+  }, [boards]);
+  const resolveClassId = (bId, g) => boards?.find((b) => b._id === bId)?.classes?.find((c) => c.grade === g)?._id ?? null;
+  const classId = grade;
   const [parent, setParent] = useState({ name: user?.profile?.parent?.name || '', relationship: user?.profile?.parent?.relationship || '', contact: '' });
   const [parentErrors, setParentErrors] = useState({});
   const [consent, setConsent] = useState({ selfDeclared: false, accepted: false });
@@ -56,7 +66,7 @@ export default function OnboardingPage() {
       if (next != null) go(next);
       return u;
     } catch (e) {
-      setError(errorMessage(e));
+      setError(e?.status >= 500 ? "We couldn't save this just now. Your choices are safe here — please press Continue to try again." : errorMessage(e));
       return null;
     } finally {
       setBusy(false);
@@ -86,15 +96,15 @@ export default function OnboardingPage() {
   const parentHasContact = Boolean(user?.profile?.parent) && !parent.contact;
   const canContinue = useMemo(() => [
     Boolean(classId),
-    Boolean(boardId),
+    Boolean(effectiveBoardId && resolveClassId(effectiveBoardId, grade)),
     true,
     consent.selfDeclared && consent.accepted,
     true,
-  ][step], [step, classId, boardId, consent]);
+  ][step], [step, classId, effectiveBoardId, grade, consent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const next = async () => {
-    if (step === 0) await save({ classId }, 1);
-    else if (step === 1) await save({ boardId }, 2);
+    if (step === 0) go(1);
+    else if (step === 1) await save({ boardId: effectiveBoardId, classId: resolveClassId(effectiveBoardId, grade) }, 2);
     else if (step === 2) {
       if (parentHasContact) { go(3); return; }
       if (validateParent()) await save({ parent: { ...parent, contact: parent.contact.trim() } }, 3);
@@ -104,7 +114,7 @@ export default function OnboardingPage() {
         track('consent_granted', { method: 'STUDENT_SELF_DECLARATION' });
         toast.success('Thanks! Your parent will be notified.');
       }
-    } else if (step === 4) await finish(avatarId || 'owl');
+    } else if (step === 4) await finish(avatarId || DEFAULT_AVATAR_ID);
   };
 
   const variants = {
@@ -143,14 +153,20 @@ export default function OnboardingPage() {
                 <section>
                   <h1 className="text-2xl font-bold sm:text-3xl">Hi {firstName(user?.name)}! Which class are you in?</h1>
                   <p className="mt-2 text-ink-500">We&apos;ll show you only the syllabus for your class. You can change this later in Settings.</p>
-                  <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
-                    {CLASSES.map((c) => (
-                      <ChoiceCard key={c} selected={classId === c} onClick={() => setClassId(c)} className="flex flex-col items-center py-5 text-center">
-                        <span className="text-3xl" aria-hidden>{CLASS_EMOJI[c]}</span>
-                        <span className="mt-2 font-display text-lg font-bold text-ink-900">Class {c}</span>
-                      </ChoiceCard>
-                    ))}
-                  </div>
+                  {boardsError && !boards ? (
+                    <Alert tone="danger" className="mt-6" action={<Button size="sm" variant="outline" onClick={refetchBoards}>Retry</Button>}>{errorMessage(boardsError)}</Alert>
+                  ) : !boards ? (
+                    <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">{[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}</div>
+                  ) : (
+                    <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
+                      {grades.map((c) => (
+                        <ChoiceCard key={c} selected={grade === c} onClick={() => setGrade(c)} className="flex flex-col items-center py-5 text-center">
+                          <span className="text-3xl" aria-hidden>{CLASS_EMOJI[c] || '📘'}</span>
+                          <span className="mt-2 font-display text-lg font-bold text-ink-900">Class {c}</span>
+                        </ChoiceCard>
+                      ))}
+                    </div>
+                  )}
                 </section>
               )}
 
@@ -158,13 +174,19 @@ export default function OnboardingPage() {
                 <section>
                   <h1 className="text-2xl font-bold sm:text-3xl">Which board do you study?</h1>
                   <p className="mt-2 text-ink-500">Gyaangrid follows the NCERT textbooks chapter by chapter.</p>
-                  <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                    {BOARDS.map((b) => (
-                      <ChoiceCard key={b.id} selected={boardId === b.id} disabled={!b.active} onClick={() => setBoardId(b.id)}>
-                        <p className="font-display text-lg font-bold text-ink-900">{b.name}</p>
-                        <p className={cn('mt-1 text-sm', b.active ? 'text-emerald-600' : 'text-ink-400')}>{b.note}</p>
-                      </ChoiceCard>
-                    ))}
+                  <div className={cn('mt-6 grid gap-3', (boards || []).length > 1 && 'sm:grid-cols-2')}>
+                    {(boards || []).map((b) => {
+                      const hasClass = Boolean(resolveClassId(b._id, grade));
+                      return (
+                        <ChoiceCard key={b._id} selected={effectiveBoardId === b._id} disabled={!hasClass} onClick={() => setBoardId(b._id)} className="flex items-center gap-4 p-4 pr-12 sm:p-5 sm:pr-14">
+                          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-100 text-brand-600"><BookOpen className="h-6 w-6" aria-hidden /></span>
+                          <span className="min-w-0">
+                            <span className="block font-display text-lg font-bold text-ink-900">{b.name || b.code}</span>
+                            <span className={cn('mt-0.5 block text-sm font-medium', hasClass ? 'text-emerald-600' : 'text-ink-400')}>{hasClass ? `Class ${grade} Mathematics is available` : `Class ${grade} isn't available yet`}</span>
+                          </span>
+                        </ChoiceCard>
+                      );
+                    })}
                   </div>
                 </section>
               )}
@@ -228,7 +250,7 @@ export default function OnboardingPage() {
                 <section>
                   <h1 className="text-2xl font-bold sm:text-3xl">Pick your study buddy</h1>
                   <p className="mt-2 text-ink-500">This is how classmates see you on the leaderboard. You can skip this and change it later.</p>
-                  <div className="mt-6 flex justify-center"><Avatar id={avatarId || 'owl'} size="xl" ring className="shadow-lift" /></div>
+                  <div className="mt-6 flex justify-center"><Avatar id={avatarId || DEFAULT_AVATAR_ID} size="xl" ring className="shadow-lift" /></div>
                   <div className="mt-6 grid grid-cols-4 gap-3 sm:grid-cols-6">
                     {AVATARS.map((a) => (
                       <button
@@ -248,7 +270,7 @@ export default function OnboardingPage() {
           <div className="mt-8 flex items-center justify-between gap-3 border-t border-ink-100 pt-6">
             <Button variant="ghost" leftIcon={ArrowLeft} onClick={() => go(step - 1)} disabled={step === 0 || busy || step === 4} className={cn((step === 0 || step === 4) && 'invisible')}>Back</Button>
             <div className="flex gap-2">
-              {step === 4 && <Button variant="outline" onClick={() => finish('owl')} disabled={busy}>Skip</Button>}
+              {step === 4 && <Button variant="outline" onClick={() => finish(DEFAULT_AVATAR_ID)} disabled={busy}>Skip</Button>}
               <Button size="lg" rightIcon={ArrowRight} onClick={next} loading={busy} disabled={!canContinue}>
                 {step === 3 ? 'I agree, continue' : step === 4 ? "Let's go!" : 'Continue'}
               </Button>

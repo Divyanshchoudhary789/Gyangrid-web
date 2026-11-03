@@ -14,20 +14,23 @@ export const REC_META = {
 export async function openRecommendation(rec, navigate) {
   if (!rec) return;
   track('recommendation_tapped', { action: rec.action });
+  // A target may be a topic or the whole class (e.g. "start reading"); only topics get a deep link.
+  const topicId = rec.targetId && rec.targetKind !== 'CLASS' ? rec.targetId : null;
   switch (rec.action) {
     case 'READ_MATERIAL':
-      navigate(`/learn/topic/${rec.targetId}`);
+      navigate(topicId ? `/learn/topic/${topicId}` : '/learn');
       break;
     case 'PRACTICE_TOPIC': {
-      const set = await practiceApi.start({ scope: 'TOPIC', targetId: rec.targetId, size: 10, difficulty: 'MIXED' });
+      if (!topicId) { navigate('/practice'); break; }
+      const set = await practiceApi.start({ scope: 'TOPIC', targetId: topicId, size: 10, difficulty: 'MIXED' });
       navigate(`/practice/session/${set.id}`);
       break;
     }
     case 'REVIEW_MISTAKES':
-      navigate(`/mistakes?topicId=${encodeURIComponent(rec.targetId)}&status=ACTIVE`);
+      navigate(topicId ? `/mistakes?topicId=${encodeURIComponent(topicId)}&status=ACTIVE` : '/mistakes?status=ACTIVE');
       break;
     case 'TAKE_TEST':
-      navigate(rec.targetId ? `/tests/${rec.targetId}` : '/tests');
+      navigate(topicId ? `/tests/${topicId}` : '/tests');
       break;
     default:
       navigate('/challenge');

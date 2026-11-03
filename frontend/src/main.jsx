@@ -2,12 +2,18 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import './index.css';
-import { setTokenProvider, setUnauthorizedHandler } from '@/services/http';
+import { setTokenProvider, setUnauthorizedHandler, isMockMode } from '@/services/http';
+import { getIdToken } from '@/services/auth/firebase';
 import { useAuthStore, useAdminStore } from '@/store/authStore';
 import { clearQueryCache } from '@/hooks/useQuery';
 import { track } from '@/lib/analytics';
 
-setTokenProvider((scope) => (scope === 'admin' ? useAdminStore.getState().token : useAuthStore.getState().token));
+if (isMockMode()) {
+  setTokenProvider(async (scope) => (scope === 'admin' ? useAdminStore.getState().token : useAuthStore.getState().token));
+} else {
+  // Real backend: always a fresh Firebase ID token (the SDK refreshes it before expiry).
+  setTokenProvider(async (_scope, forceRefresh) => getIdToken(Boolean(forceRefresh)));
+}
 
 // Expired / revoked session: clear local state and send the user to the right sign-in page.
 setUnauthorizedHandler((scope) => {
@@ -18,7 +24,7 @@ setUnauthorizedHandler((scope) => {
   }
   useAuthStore.getState().clear();
   clearQueryCache();
-  if (!['/login', '/signup', '/'].includes(window.location.pathname)) window.location.assign('/login');
+  if (!['/login', '/signup', '/', '/forgot-password', '/privacy', '/terms'].includes(window.location.pathname)) window.location.assign('/login');
 });
 
 track('app_open');

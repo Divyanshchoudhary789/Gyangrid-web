@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Mic, Square, RotateCcw, Keyboard, LoaderCircle } from 'lucide-react';
 import { Button, Alert, TextArea } from '@/components/ui';
 import { doubtApi } from '@/services/api/student';
-import { errorMessage } from '@/services/errors';
+import { ERROR_CODES, errorMessage } from '@/services/errors';
 import { DOUBT_LIMITS } from '@/config/constants';
 import { formatDuration } from '@/lib/date';
 
@@ -52,9 +52,12 @@ export function VoiceDoubtInput({ transcript, onTranscript, onSwitchToText }) {
   const transcribeBlob = async (blob, durationSec) => {
     setState('transcribing');
     try {
-      const up = await doubtApi.signedUrl({ contentType: blob.type || 'audio/webm', size: Math.max(1, blob.size) });
-      // Production: PUT the blob to up.uploadUrl, then ask the server to transcribe the object.
-      const res = await doubtApi.transcribe({ objectRef: up.objectRef, durationSec });
+      let res;
+      if (doubtApi.chat) res = await doubtApi.transcribe(blob);
+      else {
+        const up = await doubtApi.signedUrl({ contentType: blob.type || 'audio/webm', size: Math.max(1, blob.size) });
+        res = await doubtApi.transcribe({ objectRef: up.objectRef, durationSec });
+      }
       if (!res.transcript?.trim()) {
         setError("We couldn't hear a question. Please record again or type it instead.");
         setState('idle');
@@ -63,7 +66,7 @@ export function VoiceDoubtInput({ transcript, onTranscript, onSwitchToText }) {
       onTranscript(res.transcript);
       setState('done');
     } catch (e) {
-      setError(errorMessage(e));
+      setError(e.code === ERROR_CODES.SERVICE_UNAVAILABLE ? 'Voice doubts aren\u2019t available right now. Please type your question instead.' : errorMessage(e));
       setState('idle');
     }
   };

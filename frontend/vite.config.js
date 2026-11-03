@@ -8,6 +8,7 @@ export default defineConfig({
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
   server: { port: 5173 },
+  test: { environment: 'jsdom', env: { VITE_USE_MOCK_API: 'false', VITE_API_BASE_URL: 'http://x/api/v1' } },
   build: {
     sourcemap: false,
     chunkSizeWarningLimit: 900,

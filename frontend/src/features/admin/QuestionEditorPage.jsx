@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Save, Send, CheckCircle2, Ban, Copy, ArrowLeft, BarChart3 } from 'lucide-react';
-import { Card, Button, TextField, TextArea, SelectField, PageSkeleton, ErrorState, Alert } from '@/components/ui';
+import { Save, Send, CheckCircle2, Ban, Copy, ArrowLeft, BarChart3, Trash2 } from 'lucide-react';
+import { Card, Button, TextField, TextArea, SelectField, PageSkeleton, ErrorState, Alert, ConfirmDialog } from '@/components/ui';
 import { MathText } from '@/components/math/MathText';
 import { useQuery } from '@/hooks/useQuery';
 import { adminApi } from '@/services/api/admin';
@@ -10,7 +10,15 @@ import { errorMessage } from '@/services/errors';
 import { useDocumentTitle } from '@/hooks/useCommon';
 import { formatDateTime } from '@/lib/date';
 import { cn } from '@/lib/cn';
-import { AdminPageHeader, ClassSelect, StatusBadge, useCan } from './adminShared';
+import { AdminPageHeader, ClassSelect, StatusBadge, useCan, ADMIN_CAPS, supports } from './adminShared';
+
+const REAL = Boolean(ADMIN_CAPS);
+const TYPE_OPTIONS = [
+  { value: 'MCQ_SINGLE', label: 'MCQ (single answer)' },
+  ...(REAL ? [{ value: 'TRUE_FALSE', label: 'True / False' }] : []),
+  { value: 'NUMERIC', label: REAL ? 'Short answer' : 'Numeric' },
+];
+const defaultAnswer = (type) => (type === 'MCQ_SINGLE' ? 'A' : type === 'TRUE_FALSE' ? 'true' : '');
 
 const EMPTY = { classId: 8, chapterId: '', topicId: '', type: 'MCQ_SINGLE', difficulty: 'EASY', questionText: '', options: ['', '', '', ''], correctAnswer: 'A', answerTolerance: 0, explanation: '', conceptNote: '', estimatedTimeSec: 60 };
 
@@ -23,7 +31,9 @@ export default function QuestionEditorPage() {
   const [form, setForm] = useState(EMPTY);
   const [errors, setErrors] = useState([]);
   const [busy, setBusy] = useState(false);
-  useDocumentTitle(isNew ? 'New question' : questionId);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmRetire, setConfirmRetire] = useState(false);
+  useDocumentTitle(isNew ? 'New question' : REAL ? 'Edit question' : questionId);
 
   useEffect(() => {
     if (!existing) return;
@@ -58,6 +68,13 @@ export default function QuestionEditorPage() {
   };
 
   const saveNew = (submitForReview) => run(() => adminApi.createQuestion({ ...payload(), submitForReview }), submitForReview ? 'Submitted for review.' : 'Draft saved.', (q) => navigate(`/admin/questions/${encodeURIComponent(q.questionId)}`, { replace: true }));
+  // Live backend has no review queue: create as a draft, then publish.
+  const saveAndPublish = () => run(async () => {
+    const q = await adminApi.createQuestion(payload());
+    try { await adminApi.setQuestionStatus(q.questionId, 'APPROVED'); } catch (e) { navigate(`/admin/questions/${encodeURIComponent(q.questionId)}`, { replace: true }); throw e; }
+    return q;
+  }, 'Published — now served to students.', (q) => navigate(`/admin/questions/${encodeURIComponent(q.questionId)}`, { replace: true }));
+  const remove = () => run(() => adminApi.deleteQuestion(questionId), existing?.status === 'APPROVED' ? 'Question retired.' : 'Question deleted.', () => navigate('/admin/questions', { replace: true }));
   const saveEdit = () => run(() => adminApi.updateQuestion(questionId, payload()), 'Saved. Students’ past mistakes keep their original snapshot.');
   const setStatus = (status, msg) => run(() => adminApi.setQuestionStatus(questionId, status), msg);
   const duplicate = () => run(() => adminApi.duplicateQuestion(questionId), 'Duplicated as a draft.', (q) => navigate(`/admin/questions/${encodeURIComponent(q.questionId)}`));
@@ -72,9 +89,9 @@ export default function QuestionEditorPage() {
     <div>
       <button type="button" onClick={() => navigate('/admin/questions')} className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-ink-500 hover:text-brand-600"><ArrowLeft className="h-4 w-4" />Question bank</button>
       <AdminPageHeader
-        title={isNew ? 'New question' : questionId}
-        subtitle={existing ? `v${existing.version} · ${existing.source.replace('_', ' ')} · updated ${formatDateTime(existing.updatedAt)}` : 'Author in LaTeX: wrap maths in $…$'}
-        action={existing && <StatusBadge status={existing.status} />}
+        title={isNew ? 'New question' : REAL ? 'Edit question' : questionId}
+        subtitle={existing ? [REAL ? `ID ${questionId}` : null, existing.version ? `v${existing.version}` : null, existing.source ? existing.source.replace('_', ' ') : null, existing.updatedAt ? `updated ${formatDateTime(existing.updatedAt)}` : null].filter(Boolean).join(' · ') : 'Author in LaTeX: wrap maths in $…$'}
+        action={existing && <StatusBadge status={REAL && existing.status === 'APPROVED' ? 'PUBLISHED' : existing.status} />}
       />
       {errors.length > 0 && <Alert tone="danger" className="mb-4" title="Please fix the following">{<ul className="list-disc pl-4">{errors.map((e) => <li key={e}>{e}</li>)}</ul>}</Alert>}
 
@@ -84,9 +101,9 @@ export default function QuestionEditorPage() {
             <ClassSelect value={form.classId} onChange={(classId) => set({ classId, chapterId: '', topicId: '' })} />
             <SelectField label="Chapter" value={form.chapterId} placeholder="Choose…" onChange={(e) => set({ chapterId: e.target.value, topicId: '' })} options={(cur?.chapters || []).map((c) => ({ value: c.id, label: c.name }))} />
             <SelectField label="Topic" value={form.topicId} placeholder="Choose…" onChange={(e) => set({ topicId: e.target.value })} options={(chapter?.topics || []).map((t) => ({ value: t.id, label: t.name }))} />
-            <SelectField label="Type" value={form.type} onChange={(e) => set({ type: e.target.value, correctAnswer: e.target.value === 'MCQ_SINGLE' ? 'A' : '' })} options={[{ value: 'MCQ_SINGLE', label: 'MCQ (single answer)' }, { value: 'NUMERIC', label: 'Numeric' }]} />
+            <SelectField label="Type" value={form.type} onChange={(e) => set({ type: e.target.value, correctAnswer: defaultAnswer(e.target.value) })} options={TYPE_OPTIONS} />
             <SelectField label="Difficulty" value={form.difficulty} onChange={(e) => set({ difficulty: e.target.value })} options={['EASY', 'MEDIUM', 'HARD'].map((d) => ({ value: d, label: d }))} />
-            <TextField label="Est. time (sec)" type="number" min={10} value={form.estimatedTimeSec} onChange={(e) => set({ estimatedTimeSec: e.target.value })} />
+            {supports('estimatedTime') && <TextField label="Est. time (sec)" type="number" min={10} value={form.estimatedTimeSec} onChange={(e) => set({ estimatedTimeSec: e.target.value })} />}
           </Card>
           <Card>
             <TextArea label="Question text" value={form.questionText} onChange={(e) => set({ questionText: e.target.value })} rows={3} placeholder="Solve for $x$: $5x - 3 = 2x + 9$" required />
@@ -100,31 +117,41 @@ export default function QuestionEditorPage() {
                   </div>
                 ))}
               </div>
+            ) : form.type === 'TRUE_FALSE' ? (
+              <div className="mt-4">
+                <p className="label">Correct answer</p>
+                <div className="flex gap-2">
+                  {['true', 'false'].map((v) => (
+                    <button key={v} type="button" onClick={() => set({ correctAnswer: v })} aria-pressed={form.correctAnswer === v} className={cn('h-10 rounded-xl px-5 text-sm font-bold', form.correctAnswer === v ? 'bg-emerald-500 text-white' : 'bg-ink-100 text-ink-600')}>{v === 'true' ? 'True' : 'False'}</button>
+                  ))}
+                </div>
+              </div>
             ) : (
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <TextField label="Correct answer" value={form.correctAnswer} onChange={(e) => set({ correctAnswer: e.target.value })} inputMode="decimal" />
-                <TextField label="Tolerance (±)" type="number" step="0.001" value={form.answerTolerance} onChange={(e) => set({ answerTolerance: e.target.value })} />
+                <TextField label="Correct answer" value={form.correctAnswer} onChange={(e) => set({ correctAnswer: e.target.value })} inputMode={REAL ? 'text' : 'decimal'} hint={REAL ? 'Keep it short and unambiguous, e.g. 4 or 2/3.' : undefined} />
+                {supports('answerTolerance') && <TextField label="Tolerance (±)" type="number" step="0.001" value={form.answerTolerance} onChange={(e) => set({ answerTolerance: e.target.value })} />}
               </div>
             )}
           </Card>
           <Card>
             <TextArea label="Step-by-step explanation (one step per line)" value={form.explanation} onChange={(e) => set({ explanation: e.target.value })} rows={6} hint="Mandatory for approval — the Mistake Bank depends on it." error={noExplanation && existing?.status === 'APPROVED' ? 'Approved questions must keep an explanation.' : undefined} />
-            <TextArea className="mt-4" label="Concept note (recommended)" value={form.conceptNote} onChange={(e) => set({ conceptNote: e.target.value })} rows={3} />
+            {supports('conceptNote') && <TextArea className="mt-4" label="Concept note (recommended)" value={form.conceptNote} onChange={(e) => set({ conceptNote: e.target.value })} rows={3} />}
           </Card>
           {canEdit && (
             <div className="flex flex-wrap gap-2">
               {isNew ? (
                 <>
                   <Button variant="outline" leftIcon={Save} loading={busy} onClick={() => saveNew(false)}>Save draft</Button>
-                  <Button leftIcon={Send} loading={busy} onClick={() => saveNew(true)}>Submit for review</Button>
+                  {supports('reviewQueue') ? <Button leftIcon={Send} loading={busy} onClick={() => saveNew(true)}>Submit for review</Button> : <Button leftIcon={CheckCircle2} loading={busy} disabled={noExplanation} onClick={saveAndPublish} title={noExplanation ? 'Add an explanation to publish' : undefined}>Save &amp; publish</Button>}
                 </>
               ) : (
                 <>
                   <Button variant="outline" leftIcon={Save} loading={busy} onClick={saveEdit}>Save changes</Button>
-                  {existing.status !== 'APPROVED' && <Button variant="success" leftIcon={CheckCircle2} loading={busy} disabled={noExplanation} onClick={() => setStatus('APPROVED', 'Approved — now served to students.')} title={noExplanation ? 'Add an explanation to approve' : undefined}>Approve</Button>}
-                  {existing.status === 'DRAFT' && <Button variant="secondary" leftIcon={Send} onClick={() => setStatus('IN_REVIEW', 'Sent to review queue.')}>Send to review</Button>}
-                  {existing.status !== 'RETIRED' && <Button variant="danger" leftIcon={Ban} onClick={() => setStatus('RETIRED', 'Retired — no longer served.')}>Retire</Button>}
+                  {(REAL ? existing.status === 'DRAFT' : existing.status !== 'APPROVED') && <Button variant="success" leftIcon={CheckCircle2} loading={busy} disabled={noExplanation} onClick={() => setStatus('APPROVED', REAL ? 'Published — now served to students.' : 'Approved — now served to students.')} title={noExplanation ? 'Add an explanation to approve' : undefined}>{REAL ? 'Publish' : 'Approve'}</Button>}
+                  {existing.status === 'DRAFT' && supports('reviewQueue') && <Button variant="secondary" leftIcon={Send} onClick={() => setStatus('IN_REVIEW', 'Sent to review queue.')}>Send to review</Button>}
+                  {(REAL ? existing.status === 'APPROVED' : existing.status !== 'RETIRED') && <Button variant="danger" leftIcon={Ban} onClick={() => (REAL ? setConfirmRetire(true) : setStatus('RETIRED', 'Retired — no longer served.'))}>Retire</Button>}
                   <Button variant="ghost" leftIcon={Copy} onClick={duplicate}>Duplicate</Button>
+                  {REAL && <Button variant="ghost" leftIcon={Trash2} className="text-rose-600" onClick={() => setConfirmDelete(true)}>Delete</Button>}
                 </>
               )}
             </div>
@@ -137,7 +164,7 @@ export default function QuestionEditorPage() {
             <MathText as="p" text={form.questionText || 'Your question appears here'} className="font-semibold text-ink-900" />
             {form.type === 'MCQ_SINGLE' ? (
               <div className="mt-3 space-y-1.5">{keys.map((k, i) => form.options[i] && <div key={k} className={cn('rounded-xl border px-3 py-2 text-sm', form.correctAnswer === k ? 'border-emerald-300 bg-emerald-50' : 'border-ink-100')}><strong>{k}.</strong> <MathText text={form.options[i]} /></div>)}</div>
-            ) : <p className="mt-3 text-sm text-ink-600">Answer: <strong>{form.correctAnswer || '—'}</strong>{Number(form.answerTolerance) > 0 && ` (±${form.answerTolerance})`}</p>}
+            ) : form.type === 'TRUE_FALSE' ? <p className="mt-3 text-sm text-ink-600">Answer: <strong>{form.correctAnswer === 'true' ? 'True' : 'False'}</strong></p> : <p className="mt-3 text-sm text-ink-600">Answer: <strong>{form.correctAnswer || '—'}</strong>{Number(form.answerTolerance) > 0 && ` (±${form.answerTolerance})`}</p>}
             {form.explanation.trim() && (
               <ol className="mt-4 space-y-1 border-t border-ink-100 pt-3 text-sm text-ink-700">{form.explanation.split('\n').filter((s) => s.trim()).map((s, i) => <li key={i}>{i + 1}. <MathText text={s} /></li>)}</ol>
             )}
@@ -154,6 +181,12 @@ export default function QuestionEditorPage() {
           )}
         </div>
       </div>
+      <ConfirmDialog open={confirmRetire} onClose={() => setConfirmRetire(false)} onConfirm={() => { setConfirmRetire(false); setStatus('RETIRED', 'Retired — no longer served.'); }} tone="danger"
+        title="Retire this question?" description="Students will stop seeing it. A retired question can't be published again; duplicate it to reuse it." confirmLabel="Retire"
+      />
+      <ConfirmDialog open={confirmDelete} onClose={() => setConfirmDelete(false)} onConfirm={() => { setConfirmDelete(false); remove(); }} tone="danger"
+        title="Delete this question?" description="Drafts are deleted. Published questions are retired so students' past answers stay intact." confirmLabel="Delete"
+      />
     </div>
   );
 }
