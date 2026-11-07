@@ -39,6 +39,7 @@ const FRIENDLY = {
   QUOTA_EXCEEDED: "You've used all your doubts for now. Practice, tests and your Mistake Bank are still available.",
   FOLLOW_UP_LIMIT: 'This doubt has reached its limit of 2 follow-ups. Start a new doubt to keep going.',
   TWO_FACTOR_REQUIRED: 'Enter the code from your authenticator app to continue.',
+  TEST_LOCKED: 'Finish the earlier tests in this series to unlock this one.',
   FORBIDDEN: "You don't have access to this.",
 };
 
@@ -73,6 +74,7 @@ const BACKEND_CODES = {
   TWO_FACTOR_REQUIRED: ERROR_CODES.TWO_FACTOR_REQUIRED,
   ADMIN_2FA_REQUIRED: ERROR_CODES.TWO_FACTOR_REQUIRED,
   MFA_REQUIRED: ERROR_CODES.TWO_FACTOR_REQUIRED,
+  TEST_LOCKED: ERROR_CODES.TEST_LOCKED,
   TOO_MANY_REQUESTS: ERROR_CODES.RATE_LIMITED,
   CONSENT_REQUIRED: ERROR_CODES.CONSENT_REQUIRED,
   ONBOARDING_REQUIRED: ERROR_CODES.ONBOARDING_REQUIRED,

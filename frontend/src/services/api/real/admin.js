@@ -137,8 +137,8 @@ async function gradeOfClassId(classId) {
 
 const statusOfActive = (x) => (x?.isActive === false ? 'DRAFT' : 'PUBLISHED');
 
-async function listChapters(classId) {
-  return list(await get('/admin/curriculum/chapters', { classId, subject: SUBJECT, page: 1, limit: MAX_LIMIT }), 'chapters').sort(sortByOrder);
+async function listChapters(classId, { includeTopics = false } = {}) {
+  return list(await get('/admin/curriculum/chapters', { classId, includeTopics: includeTopics || undefined, page: 1, limit: MAX_LIMIT }), 'chapters').sort(sortByOrder);
 }
 async function listTopics(chapterId) {
   return list(await get('/admin/curriculum/topics', { chapterId, page: 1, limit: MAX_LIMIT }), 'topics').sort(sortByOrder);
@@ -147,10 +147,11 @@ async function listTopics(chapterId) {
 async function curriculum(grade) {
   const cls = await classFor(grade);
   if (!cls) return { classId: Number(grade), backendClassId: null, chapters: [] };
-  const chapters = await listChapters(cls.id);
+  // One request: chapters with their topics nested (falls back to per-chapter calls on older servers).
+  const chapters = await listChapters(cls.id, { includeTopics: true });
   const withTopics = await Promise.all(chapters.map(async (ch) => {
     chapterIndex.set(ch._id, { classId: cls.id, boardId: cls.boardId, name: ch.name });
-    const topics = await listTopics(ch._id);
+    const topics = Array.isArray(ch.topics) ? [...ch.topics].sort(sortByOrder) : await listTopics(ch._id);
     return {
       id: ch._id,
       name: ch.name,
@@ -555,7 +556,7 @@ async function commitImport(rows) {
   const res = unwrap(await http.post('/admin/questions/bulk-import', {
     questions: valid.map((r) => toBackendQuestion(r.normalised, { classId: r.normalised.classId, chapterId: r.normalised.chapterId, status: 'DRAFT' })),
   }), 'result') || {};
-  const imported = Number(res.insertedCount ?? res.imported ?? res.created ?? res.successCount ?? (Array.isArray(res.questions) ? res.questions.length : valid.length));
+  const imported = Number(res.successCount ?? res.insertedCount ?? res.imported ?? (Array.isArray(res.successful) ? res.successful.length : valid.length));
   return { imported, rejected: report.rows.length - imported };
 }
 
@@ -686,13 +687,15 @@ function configEntries(data) {
   }
   return Object.entries(raw || {}).map(([key, v]) => (v && typeof v === 'object' && 'value' in v
     ? { key, value: v.value, description: v.description || null, updatedAt: v.updatedAt || null, updatedBy: v.updatedBy?.email || v.updatedBy || null }
-    : { key, value: v, description: null, updatedAt: null, updatedBy: null }));
+    : { key, value: v, description: null, updatedAt: null, updatedBy: null }))
+    // updatedBy may be an internal id; only an email is meaningful to show.
+    .map((e) => ({ ...e, updatedBy: typeof e.updatedBy === 'string' && e.updatedBy.includes('@') ? e.updatedBy : null }));
 }
 
 /* ------------------------------------------------------------------ students */
 
 // The list has no consent fields; onboarding can only complete after consent is given.
-const consentOf = (u) => Boolean(u.parentPermissionGranted ?? u.consent?.parentPermissionGranted ?? u.consentedAt ?? u.consent?.consentedAt)
+const consentOf = (u) => Boolean(u.consentedAt || u.parentPermissionGranted || u.consent?.parentPermissionGranted || u.consent?.consentedAt)
   || String(u.onboardingStatus || '').toUpperCase() === 'COMPLETED';
 
 async function mapStudentRow(u) {
@@ -700,16 +703,17 @@ async function mapStudentRow(u) {
     id: u.id || u._id,
     displayName: u.displayName || u.name || (u.email ? u.email.split('@')[0] : 'Student'),
     emailMasked: u.email ? maskContact(u.email) : '—',
-    classId: await gradeOfClassId(u.classId),
+    classId: u.class?.grade ?? await gradeOfClassId(u.classId),
     joinedAt: u.createdAt || null,
-    lastActiveAt: u.lastActiveAt || u.lastLoginAt || u.lastSeenAt || u.updatedAt || null,
+    lastActiveAt: u.lastActiveAt || u.lastLoginAt || null,
     consent: consentOf(u),
     status: String(u.status || 'ACTIVE').toUpperCase(),
   };
 }
 
 async function students(params = {}) {
-  const data = await get('/admin/students', { search: params.q || undefined, status: params.status || undefined, page: 1, limit: MAX_LIMIT });
+  const cls = params.classId ? await classFor(params.classId) : null;
+  const data = await get('/admin/students', { search: params.q || undefined, status: params.status || undefined, classId: cls?.id, page: 1, limit: MAX_LIMIT });
   let rows = await Promise.all(list(data, 'students', 'users').map(mapStudentRow));
   if (params.classId) rows = rows.filter((r) => r.classId === Number(params.classId));
   const info = pageInfo(data);
@@ -730,13 +734,14 @@ async function student(id) {
     parentMasked: cd.parentContactMasked || parent.contact || u.parentContactMasked || (u.parentContact ? maskContact(u.parentContact) : '—'),
     parentRelationship: cd.parentRelationship || parent.relationship || u.parentRelationship || null,
     consentAt: consent.consentedAt || u.consentedAt || u.consent?.consentedAt || null,
+    lastLoginAt: u.lastLoginAt || null,
     consentMethod: consent.consentMethod ? String(consent.consentMethod).replace(/_/g, ' ').toLowerCase() : null,
     consentVersion: consent.consentVersion || null,
     summary: {
       // Only values the API actually sent; a missing number must not read as a real 0.
-      totalXp: g.totalXp ?? g.xp ?? null,
-      goldCoins: g.goldCoins ?? g.coins ?? g.coinBalance ?? null,
-      currentStreak: streak.currentStreak ?? streak.current ?? g.currentStreak ?? null,
+      totalXp: u.totalXp ?? g.totalXp ?? g.xp ?? null,
+      goldCoins: u.coins ?? g.goldCoins ?? g.coins ?? g.coinBalance ?? null,
+      currentStreak: u.currentStreak ?? streak.currentStreak ?? streak.current ?? g.currentStreak ?? null,
       attempts: ls.attempts ?? null,
       testsAttempted: ls.testsAttempted ?? null,
       accuracyOverall: ls.accuracy != null ? Math.round(ls.accuracy) : g.accuracy ?? null,
@@ -823,6 +828,15 @@ async function createKbDoc({ title, description, file, sourceUrl }) {
 
 /* ------------------------------------------------------------------ moderation */
 
+/** A reported doubt arrives with its messages: the question plus what the tutor answered. */
+function doubtSnapshot(doubt) {
+  const messages = doubt && typeof doubt === 'object' ? doubt.messages || [] : [];
+  if (!messages.length) return null;
+  const input = messages.find((x) => x.role === 'student')?.text || '';
+  const steps = messages.filter((x) => x.role !== 'student').flatMap((x) => String(x.text || '').split(/\n+/)).map((x) => x.trim()).filter(Boolean);
+  return { input, concept: null, steps: steps.length ? steps : null };
+}
+
 /** Question reports and AI-answer reports share one queue. */
 function mapModeration(m) {
   const q = typeof m.questionId === 'object' && m.questionId ? m.questionId : m.question || null;
@@ -838,7 +852,7 @@ function mapModeration(m) {
     at: m.createdAt || null,
     topicName: m.topicName || null,
     studentRef: null, // never a name or contact (F12-12)
-    snapshot: m.snapshot ? { input: m.snapshot.input || m.snapshot.text || '', concept: m.snapshot.concept || null, steps: m.snapshot.steps || null } : null,
+    snapshot: m.snapshot ? { input: m.snapshot.input || m.snapshot.text || '', concept: m.snapshot.concept || null, steps: m.snapshot.steps || null } : doubtSnapshot(m.doubtId),
     resolution: m.resolution?.action || m.resolutionAction || m.action || null,
     // resolvedBy is a raw user id today; only ever show a readable email.
     resolvedBy: m.resolvedBy?.email || m.resolvedByEmail || null,
@@ -900,6 +914,12 @@ export const adminApi = {
     return { session: { token: admin.uid, admin } };
   },
   verify: na('Admin two-step verification'),
+  /** Firebase still remembers the admin: used to go straight to the code step when 2FA lapses. */
+  async signedInAdmin() {
+    const fb = (await authReady()) || currentFirebaseUser();
+    if (!fb) return null;
+    try { return await verifyAdmin(); } catch { return null; }
+  },
   async me() {
     const fb = (await authReady()) || currentFirebaseUser();
     if (!fb) throw new ApiError(ERROR_CODES.UNAUTHENTICATED, 'Please sign in again.', { status: 401 });

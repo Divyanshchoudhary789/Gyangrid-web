@@ -20,6 +20,16 @@ const OUTCOME = {
   UNKNOWN: { tone: 'info', title: 'Already attempted', text: 'We tried sending this week’s report and can’t confirm the result, so we won’t send it twice. Ask your parent to check their inbox.' },
   UNCONFIGURED: { tone: 'warning', title: 'Email isn’t set up yet', text: 'Reports can’t be sent right now. Please try again later.', retry: true },
   FAILED: { tone: 'warning', title: 'Couldn’t send it', text: 'Something went wrong while sending. You can try again.', retry: true },
+  RETRY_REQUIRED: { tone: 'warning', title: 'Couldn’t send it', text: 'The last attempt didn’t go through. You can try again.', retry: true },
+  ALREADY_ACCEPTED: { tone: 'success', title: 'Already sent', text: 'This week’s report has already gone out. A new one comes next week.' },
+  DELIVERY_IN_PROGRESS: { tone: 'info', title: 'On its way', text: 'This week’s report is being sent right now.' },
+};
+
+/** Why a report couldn't be sent at all (takes priority over the delivery status). */
+const REASON = {
+  EMAIL_NOT_CONFIGURED: OUTCOME.UNCONFIGURED,
+  PARENT_REPORT_DISABLED: { tone: 'info', title: 'Weekly report is switched off', text: 'Turn on “Send my parent a weekly report” in Settings to send it.' },
+  PARENT_CONSENT_MISSING: { tone: 'warning', title: 'Parent permission needed', text: 'A report can only be sent once your parent’s permission is recorded.' },
 };
 
 export function LiveParentReport() {
@@ -62,7 +72,7 @@ export function LiveParentReport() {
     }
   };
 
-  const o = outcome && (OUTCOME[outcome.status] || OUTCOME.UNKNOWN);
+  const o = outcome && (REASON[outcome.reason] || OUTCOME[outcome.status] || OUTCOME.UNKNOWN);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">

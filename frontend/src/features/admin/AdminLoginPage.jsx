@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { Mail, Lock, KeyRound, ShieldCheck, ArrowLeft } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
@@ -24,6 +24,15 @@ export default function AdminLoginPage() {
   const [challenge, setChallenge] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+
+  // The 2FA session lapsed while Firebase still knows the admin: ask only for a fresh code.
+  const reverify = Boolean(location.state?.reverify);
+  useEffect(() => {
+    if (!reverify || !adminApi.signedInAdmin) return undefined;
+    let live = true;
+    adminApi.signedInAdmin().then((a) => { if (live && a) setStep('totp'); });
+    return () => { live = false; };
+  }, [reverify]);
 
   if (token) return <Navigate to="/admin" replace />;
 

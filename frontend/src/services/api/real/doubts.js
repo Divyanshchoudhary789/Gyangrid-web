@@ -11,6 +11,9 @@ import { putToSignedUrl } from './uploads';
 const MAX_FOLLOW_UPS = 2;
 const feedbackKey = (id) => `rv:doubt-feedback:${id}`;
 
+/** One key per user action, so a network retry never uses quota twice or duplicates a doubt. */
+const idempotencyKey = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`);
+
 const mapQuota = (q) => (q ? {
   limit: q.perDay ?? 0,
   usedToday: q.usedToday ?? 0,
@@ -76,7 +79,7 @@ async function createDoubt({ text, imageBlob, topicId }) {
   if (text) body.text = text;
   if (topicId) body.topicId = topicId;
   if (imageBlob) body.imageUploadId = await uploadMedia({ kind: 'IMAGE', blob: imageBlob });
-  const r = await http.post('/doubts', body, { ai: true });
+  const r = await http.post('/doubts', body, { ai: true, headers: { 'Idempotency-Key': idempotencyKey() } });
   if (r.refused) return { id: null, refused: true, refusal: r.refusal || '' };
   return {
     id: r.doubtId,
@@ -111,13 +114,15 @@ async function report(id, { reason, note }) {
 export const doubtApi = {
   available: true,
   chat: true,
+  // The backend's AI provider can't read images yet; photo questions return 503.
+  imageSolving: false,
   quota,
   list: listDoubts,
   get: async (id) => mapDoubt(await http.get(`/doubts/${id}`)),
   create: createDoubt,
   followUp: async (id, text) => {
     if (!text?.trim()) throw new ApiError(ERROR_CODES.VALIDATION, 'Type your follow-up question first.');
-    return mapDoubt(await http.post(`/doubts/${id}/follow-up`, { text: text.trim() }, { ai: true }));
+    return mapDoubt(await http.post(`/doubts/${id}/follow-up`, { text: text.trim() }, { ai: true, headers: { 'Idempotency-Key': idempotencyKey() } }));
   },
   feedback,
   report,

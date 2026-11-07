@@ -67,6 +67,15 @@ describe('AI doubts', () => {
     expect(await doubtApi.quota()).toMatchObject({ limit: 5, usedToday: 1, imageLimit: 2, imagesUsed: 1 });
   });
 
+  it('sends an Idempotency-Key with each new doubt', async () => {
+    routes['POST /doubts'] = ok({ doubtId: 'd1', status: 'ANSWERED', refused: false, answer: { steps: [] } }, 201);
+    await doubtApi.create({ text: 'Solve 2x = 4' });
+    await doubtApi.create({ text: 'Solve 2x = 4' });
+    const keys = calls.filter((c) => c.path === '/doubts').map((c) => c.headers['Idempotency-Key']);
+    expect(keys[0]).toMatch(/.{8,}/);
+    expect(keys[0]).not.toBe(keys[1]);
+  });
+
   it('treats a duplicate report as already reported', async () => {
     routes['POST /doubts/d1/report'] = fail(409, 'DUPLICATE_REPORT', 'already reported');
     expect(await doubtApi.report('d1', { reason: 'UNCLEAR' })).toEqual({ reported: true, duplicate: true });
@@ -94,6 +103,8 @@ describe('error codes', () => {
     [429, 'FOLLOW_UP_LIMIT_EXCEEDED', ERROR_CODES.FOLLOW_UP_LIMIT],
     [429, 'RATE_LIMIT_EXCEEDED', ERROR_CODES.RATE_LIMITED],
     [409, 'DUPLICATE_REPORT', ERROR_CODES.CONFLICT],
+    [403, 'TWO_FACTOR_REQUIRED', ERROR_CODES.TWO_FACTOR_REQUIRED],
+    [403, 'TEST_LOCKED', ERROR_CODES.TEST_LOCKED],
   ])('%s %s', (status, errorCode, expected) => {
     expect(mapBackendError(status, { errorCode, message: 'x' }).code).toBe(expected);
   });
@@ -156,6 +167,13 @@ describe('live response shapes', () => {
     routes['GET /mistakes'] = ok({ items: [{ _id: 'm1', status: 'ACTIVE', nextReviewAt: '2026-11-03T10:25:23.643Z', dueToday: false, question: { questionText: 'q' } }], pagination: { total: 1 } });
     routes['GET /curriculum/classes/undefined/chapters'] = ok({ chapters: [] });
     expect((await mistakeApi.list({})).items[0].nextReviewAt).toBe('2026-11-03');
+  });
+
+  it('opens one session when a test is started twice at once', async () => {
+    routes['POST /tests/t9/start'] = ok({ sessionId: 's9', test: { title: 'T' }, durationSeconds: 60, expiresAt: '2099-01-01T00:00:00.000Z', questions: [], currentAnswerState: [] }, 201);
+    const [a, b] = await Promise.all([testApi.start('t9'), testApi.start('t9')]);
+    expect(calls.filter((c) => c.path === '/tests/t9/start')).toHaveLength(1);
+    expect(a.attemptId).toBe(b.attemptId);
   });
 
   it('derives the attempt score from history rows and time from the session', async () => {
@@ -236,6 +254,37 @@ describe('admin', () => {
     routes['POST /admin/questions/bulk-import'] = ok({ inserted: 1 });
     await adminApi.commitImport([{ classId: id, chapterId: id, topicId: id, type: 'TRUE_FALSE', difficulty: 'EASY', questionText: 'Two is an even number.', correctAnswer: 'true', explanation: 'It divides by 2' }]);
     expect(called('POST', '/admin/questions/bulk-import').body.questions[0].correctAnswer).toBe('TRUE');
+  });
+
+  it('loads chapters with nested topics in one call', async () => {
+    routes['GET /admin/curriculum/classes'] = ok({ classes: [{ _id: 'c8', grade: 8, boardId: 'b' }] });
+    routes['GET /admin/curriculum/chapters'] = ok({ chapters: [{ _id: 'h1', name: 'Fractions', chapterNumber: 1, isActive: true, topics: [{ _id: 't2', name: 'B', topicNumber: 2, isActive: false }, { _id: 't1', name: 'A', topicNumber: 1, isActive: true }] }] });
+    const r = await adminApi.curriculum(8);
+    expect(calls.filter((c) => c.path === '/admin/curriculum/topics')).toHaveLength(0);
+    expect(calls.find((c) => c.path === '/admin/curriculum/chapters').search).toContain('includeTopics=true');
+    expect(r.chapters[0].topics.map((t) => [t.id, t.status])).toEqual([['t1', 'PUBLISHED'], ['t2', 'DRAFT']]);
+  });
+
+  it('shows authoritative rewards and activity for a student', async () => {
+    routes['GET /admin/curriculum/classes'] = ok({ classes: [{ _id: 'c6', grade: 6, boardId: 'b' }] });
+    routes['GET /admin/students/s1'] = ok({ student: { id: 's1', displayName: 'A', status: 'ACTIVE', classId: 'c6', consentedAt: '2026-11-01T00:00:00.000Z', lastActiveAt: '2026-11-06T00:00:00.000Z', totalXp: 120, coins: 15, currentStreak: 3, class: { id: 'c6', name: 'Class 6', grade: 6 }, learningSummary: { attempts: 10, accuracy: 80, testsAttempted: 2 } } });
+    routes['GET /admin/students/s1/consent'] = fail(404, 'NOT_FOUND', 'x');
+    const s = await adminApi.student('s1');
+    expect(s).toMatchObject({ id: 's1', classId: 6, consent: true, lastActiveAt: '2026-11-06T00:00:00.000Z' });
+    expect(s.summary).toMatchObject({ totalXp: 120, goldCoins: 15, currentStreak: 3, attempts: 10, accuracyOverall: 80 });
+  });
+
+  it('never shows an internal id as the config editor', async () => {
+    routes['GET /admin/config'] = ok({ configs: { maintenanceMode: { value: false, description: 'x', updatedAt: '2026-11-06T12:00:00.000Z', updatedBy: '66d0000000000000000000aa' } } });
+    routes['GET /admin/config/history'] = ok({ items: [] });
+    expect((await adminApi.config()).entries[0].updatedBy).toBeNull();
+  });
+
+  it('shows the reported AI answer to moderators', async () => {
+    routes['GET /admin/moderation'] = ok({ items: [{ _id: 'r1', status: 'OPEN', reason: 'WRONG_ANSWER', doubtId: { _id: 'd1', messages: [{ role: 'student', text: 'Solve 3x + 5 = 20' }, { role: 'tutor', text: 'Subtract 5.\nDivide by 3.' }] }, resolvedByEmail: null }] });
+    const [item] = (await adminApi.moderation('OPEN')).items;
+    expect(item.type).toBe('AI_ANSWER_REPORT');
+    expect(item.snapshot).toEqual({ input: 'Solve 3x + 5 = 20', concept: null, steps: ['Subtract 5.', 'Divide by 3.'] });
   });
 
   it('maps knowledge base documents', async () => {

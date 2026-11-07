@@ -26,6 +26,11 @@ const REPORT_REASONS = [
 
 const STAGES = ['Reading your follow-up…', 'Finding a simpler way…', 'Writing it out…'];
 
+// Messages a student can act on are shown as-is; anything else (e.g. an AI provider error) is replaced,
+// so internal provider details never reach the screen.
+const SHOW_AS_IS = [ERROR_CODES.FOLLOW_UP_LIMIT, ERROR_CODES.QUOTA_EXCEEDED, ERROR_CODES.RATE_LIMITED, ERROR_CODES.NETWORK, ERROR_CODES.TIMEOUT];
+const followUpMessage = (e) => (SHOW_AS_IS.includes(e.code) ? errorMessage(e) : 'Your tutor couldn’t answer that follow-up just now. Try rephrasing it, or ask a new doubt.');
+
 /** The structured answer returned right after asking; a reload falls back to the saved messages. */
 function FreshAnswer({ answer }) {
   return (
@@ -208,7 +213,7 @@ export function DoubtChat() {
         <div ref={endRef} />
       </div>
 
-      {sendError && <Alert tone={sendError.code === ERROR_CODES.FOLLOW_UP_LIMIT ? 'info' : 'danger'} className="mt-4">{errorMessage(sendError)}</Alert>}
+      {sendError && <Alert tone={sendError.code === ERROR_CODES.FOLLOW_UP_LIMIT ? 'info' : 'danger'} className="mt-4">{followUpMessage(sendError)}</Alert>}
 
       {!thinking && (
         d.followUpsLeft > 0 ? (

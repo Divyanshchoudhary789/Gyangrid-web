@@ -20,5 +20,7 @@ export const env = Object.freeze({
     messagingSenderId: e.VITE_FIREBASE_MESSAGING_SENDER_ID,
     appId: e.VITE_FIREBASE_APP_ID,
     measurementId: e.VITE_FIREBASE_MEASUREMENT_ID,
+    appCheckSiteKey: e.VITE_FIREBASE_APPCHECK_SITE_KEY || '',
+    appCheckDebugToken: e.VITE_FIREBASE_APPCHECK_DEBUG_TOKEN || '',
   }),
 });

@@ -50,6 +50,7 @@ const STATUS = {
   ANSWERED: { tone: 'success', label: 'Answered', icon: CheckCircle2 },
 };
 const CHAT = Boolean(doubtApi.chat); // live backend: conversation model
+const PHOTO_SOLVING = doubtApi.imageSolving !== false;
 
 function DoubtsPageFull() {
   useDocumentTitle('Ask a doubt');
@@ -90,7 +91,7 @@ function DoubtsPageFull() {
 
   const canSend = online && !busy && (
     (mode === 'text' && sanitizeText(text).length >= 3)
-    || (mode === 'image' && image)
+    || (mode === 'image' && image && PHOTO_SOLVING)
     || (mode === 'voice' && sanitizeText(transcript).length >= 3)
   );
 
@@ -172,7 +173,18 @@ function DoubtsPageFull() {
                   <MathKeypad onInsert={insert} />
                 </div>
               )}
-              {mode === 'image' && (
+              {mode === 'image' && !PHOTO_SOLVING && (
+                <div className="flex flex-col items-center rounded-2xl border border-dashed border-ink-200 bg-ink-50/60 px-4 py-10 text-center">
+                  <Camera className="h-10 w-10 text-ink-300" aria-hidden />
+                  <p className="mt-3 font-display text-lg font-bold text-ink-800">Photo questions are coming soon</p>
+                  <p className="mt-1 max-w-sm text-sm text-ink-500">For now, type your question or say it out loud. The maths keypad helps with symbols.</p>
+                  <div className="mt-5 flex flex-wrap justify-center gap-2">
+                    <Button size="sm" leftIcon={Keyboard} onClick={() => setMode('text')}>Type it</Button>
+                    <Button size="sm" variant="outline" leftIcon={Mic} onClick={() => setMode('voice')}>Say it</Button>
+                  </div>
+                </div>
+              )}
+              {mode === 'image' && PHOTO_SOLVING && (
                 <div className="space-y-4">
                   <ImageDoubtInput value={image} onChange={setImage} />
                   {image && <TextArea label="Anything to add? (optional)" value={imageNote} onChange={(e) => setImageNote(e.target.value)} maxLength={300} rows={2} placeholder="e.g. I'm stuck at step 2" />}

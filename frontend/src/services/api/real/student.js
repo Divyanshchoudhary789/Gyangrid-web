@@ -528,10 +528,11 @@ async function historyByTest() {
   const d = await http.get('/tests/history', { page: 1, limit: 50 }).catch(() => null);
   const map = new Map();
   inProgress.clear();
-  list(d).filter((r) => String(r.status || '').toUpperCase() === 'IN_PROGRESS').forEach((r) => {
+  const isOpen = (r) => r.isSession === true ? ['ACTIVE', 'IN_PROGRESS'].includes(String(r.status || '').toUpperCase()) : String(r.status || '').toUpperCase() === 'IN_PROGRESS';
+  list(d).filter(isOpen).forEach((r) => {
     inProgress.set(String(r.testId?._id || r.testId), { sessionId: r.sessionId || r._id, expiresAt: r.expiresAt });
   });
-  [...list(d).filter((r) => String(r.status || 'SUBMITTED').toUpperCase() !== 'IN_PROGRESS')].sort((a, b) => String(a.submittedAt).localeCompare(String(b.submittedAt))).forEach((r) => {
+  [...list(d).filter((r) => !isOpen(r) && !(r.isSession && !r.submittedAt))].sort((a, b) => String(a.submittedAt).localeCompare(String(b.submittedAt))).forEach((r) => {
     const k = String(r.testId?._id || r.testId);
     if (!map.has(k)) map.set(k, []);
     map.get(k).push(r);
@@ -746,9 +747,9 @@ async function testResult(attemptId) {
   const d = await http.get(`/tests/sessions/${attemptId}/result`);
   const r = d.result || d;
   // The result has no duration; the history row for this session has both timestamps.
-  const hist = r.timeTakenSeconds == null ? await http.get('/tests/history', { testId: r.testId, page: 1, limit: 50 }).catch(() => null) : null;
+  const hist = r.timeTakenSeconds == null && !d.session?.startedAt ? await http.get('/tests/history', { testId: r.testId, page: 1, limit: 50 }).catch(() => null) : null;
   const row = list(hist).find((h) => String(h.sessionId) === String(attemptId));
-  const startedAt = r.startedAt || row?.startedAt;
+  const startedAt = r.startedAt || d.session?.startedAt || row?.startedAt;
   const t = d.test || {};
   const total = r.totalQuestions ?? 0;
   const correct = r.correctCount ?? 0;
@@ -797,8 +798,15 @@ async function getSeries(id) {
   return s;
 }
 
+/** Concurrent starts of the same test share one request, so a double tap never opens two sessions. */
+const startsInFlight = new Map();
+function startTestOnce(id) {
+  if (!startsInFlight.has(id)) startsInFlight.set(id, startTest(id).finally(() => startsInFlight.delete(id)));
+  return startsInFlight.get(id);
+}
+
 export const testApi = {
-  list: listTests, get: getTestDetail, start: startTest, autosave: autosaveTest, submit: submitTest, result: testResult, series: getSeries,
+  list: listTests, get: getTestDetail, start: startTestOnce, autosave: autosaveTest, submit: submitTest, result: testResult, series: getSeries,
 };
 
 /* ================================================================== mistakes (/mistakes) */
@@ -933,7 +941,8 @@ export const mistakeApi = {
   retry: retryMistake,
   archive: archiveMistake,
   simpler: (id) => http.post(`/mistakes/${id}/simpler-explanation`, {}, { ai: true }),
-  capabilities: { retry: true, archive: true, simpler: true, review: true, resolve: false, reopen: true, search: 'server', dueDates: true },
+  // simpler: the backend's AI provider has this switched off (503), so the button stays hidden.
+  capabilities: { retry: true, archive: true, simpler: false, review: true, resolve: false, reopen: true, search: 'server', dueDates: true },
   statuses: ['DUE', 'ACTIVE', 'REVIEWED', 'RESOLVED', 'ARCHIVED', 'ALL'],
 };
 

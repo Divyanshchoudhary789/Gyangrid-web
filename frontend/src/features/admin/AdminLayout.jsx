@@ -5,6 +5,7 @@ import { Logo } from '@/components/brand/Logo';
 import { PageSkeleton, Badge } from '@/components/ui';
 import { useAdminStore } from '@/store/authStore';
 import { adminApi } from '@/services/api/admin';
+import { ERROR_CODES } from '@/services/errors';
 import { ROLE_LABELS } from '@/config/constants';
 import { cn } from '@/lib/cn';
 import { CAN, ADMIN_CAPS, supports } from './adminShared';
@@ -33,12 +34,17 @@ export default function AdminLayout() {
   useEffect(() => {
     if (!ADMIN_CAPS) return undefined;
     let cancelled = false;
-    adminApi.me().catch(() => {
-      if (cancelled) return;
+    const toLogin = (reverify) => {
       clear();
-      navigate('/admin/login', { replace: true });
+      navigate('/admin/login', { replace: true, state: { from: window.location.pathname, reverify } });
+    };
+    adminApi.me().catch((e) => {
+      if (!cancelled) toLogin(e?.code === ERROR_CODES.TWO_FACTOR_REQUIRED);
     });
-    return () => { cancelled = true; };
+    // Any admin call can find that the 12-hour 2FA session has ended.
+    const onTwoFactor = () => toLogin(true);
+    window.addEventListener('gg:two-factor-required', onTwoFactor);
+    return () => { cancelled = true; window.removeEventListener('gg:two-factor-required', onTwoFactor); };
   }, [clear, navigate]);
 
   const logout = async () => {

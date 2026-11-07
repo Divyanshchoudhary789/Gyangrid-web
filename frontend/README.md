@@ -34,6 +34,8 @@ Requires Node 18+ (tested on Node 22).
 | `VITE_API_BASE_URL` | Backend base URL including `/api/v1`, no trailing slash. |
 | `VITE_FIREBASE_*` | Firebase Web SDK config (Authentication only). |
 | `VITE_MOCK_LATENCY_MS` | Simulated latency, mock mode only. |
+| `VITE_FIREBASE_APPCHECK_SITE_KEY` | reCAPTCHA v3 site key for Firebase App Check. Required once the backend sets `FIREBASE_APP_CHECK_REQUIRED=true`; every API call then carries `X-Firebase-AppCheck`. |
+| `VITE_FIREBASE_APPCHECK_DEBUG_TOKEN` | Local development only. Never set in production. |
 
 `.env` is git-ignored. The Firebase **web** config is not a secret: it ships in every browser bundle, and access is protected by Firebase Auth plus backend token verification. Still, keep it in `.env` and set it in your hosting provider's environment settings rather than in code. In the Firebase console, restrict the API key to your production domains (HTTP referrers) and add the domains under *Authentication → Settings → Authorized domains*.
 
@@ -133,6 +135,8 @@ src/
 - **Render cold starts:** requests time out after 60 s (90 s for AI routes), and GETs retry once on network errors and 5xx gateway errors.
 - **Adapters:** pages consume UI shapes. `services/api/real/*` maps backend responses onto them, so a backend field rename is a one-line fix there.
 - **Capabilities:** `mistakeApi.capabilities` and `adminApi.caps` describe what the backend supports, so one set of pages serves both real and mock mode.
+- **Retries are safe:** new doubts and follow-ups send an `Idempotency-Key`, so a retried request never uses quota twice.
+- **Admin 2FA:** when the 12-hour verified session ends, any admin call returns `TWO_FACTOR_REQUIRED` and the console asks only for a fresh authenticator code.
 - **Provider outages:** a `503` from AI, speech, storage or email becomes `SERVICE_UNAVAILABLE`. Screens show a calm message, keep the student's input, and never show the raw server text.
 - **Public parent report:** `/parent-report/view?token=…` is authorised only by the signed token from the email. No bearer token is sent.
 - **Answer reveal:** server-graded answers for the challenge and practice are cached per user in `localStorage` (`rv:*`), so a refresh keeps the feedback. Test sessions (`ts:*`) are cached so a refresh resumes the test. Both are cleared on sign-out.

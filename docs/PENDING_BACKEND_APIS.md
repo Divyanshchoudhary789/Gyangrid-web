@@ -1,125 +1,78 @@
-# Gyaangrid Backend — Before Go-Live
+# Gyaangrid Backend — Round 4 Findings
 
 Base URL: `https://gyaangrid-backend.onrender.com/api/v1`
 
-Checked on 30 Oct 2026 against `GyanGrid_Backend_Postman_Collection_Final.json`. All routes in the collection are live and integrated in the web frontend. What remains is the bugs below, then configuration and content.
+Tested on 7 Nov 2026 with a real student account (Class 10) against the backend described in `FLUTTER_API_HANDOFF.md` (main `84e7db7`).
 
-## Bugs found in end-to-end testing (31 Oct 2026)
+## Fixed and confirmed live
 
-Found with a real student account on the live API, Class 10. The onboarding blocker from the last round is fixed.
+| Earlier issue | Result |
+|---|---|
+| Test scoring | Chapter 1 test, 2 correct → `obtainedMarks: 4 / 4`, `percentage: 100`, `passed: true` |
+| Rewards summary | `GET /rewards/summary` = 95 XP / 10 coins, matching `/home` and the ledger |
+| Mistake retry XP | Correct retry returned `awarded: { xp: 5 }` and resolved the mistake |
+| Activity strip | Ends today (7 Nov, IST) |
+| Completion breakdown | Top level, names filled in, answered questions only (challenge, practice, test) |
+| AI doubts | Answer returned in about 8 s; refusal, feedback (+5 XP, +5 coins) and report all work |
+| Material delete | `DELETE /admin/materials/:id` exists |
+| Admin student detail | XP 205, coins 25, streak 1, consent and last-active shown |
+| Nested curriculum | `includeTopics=true` works; the admin curriculum screen now makes 1 call instead of 13+ |
+| Moderation | `resolvedByEmail` returned; reported doubts include their messages |
 
-### P0: wrong data shown to students
+## New bugs (P0)
 
-**1. Test marks ignore marks per question.** Test "Class 10 Mathematics - Chapter 1 Test" has `totalMarks: 4`, `passingMarks: 2`, 2 questions.
-- With 1 correct and 1 wrong, `GET /tests/sessions/:id/result` returns `result.totalMarks: 2`, `obtainedMarks: 1`, `passed: false`, and each question has `totalMarks: 1`.
-- Expected: `totalMarks: 4`, `obtainedMarks: 2`, `percentage: 50`, `passed: true`.
-- `GET /tests/history` has the same wrong `totalMarks`.
-- A student who reached the pass mark is shown as failed.
-- Likely cause: each question has `marks: 1`, while the test says `totalMarks: 4`. Score from the test's marks, or make the question marks match the test (and validate this when a test is saved).
+**1. Saving the same test answer twice adds a second entry, and the result then shows wrong marks.**
+- Answering a question and then saving it again (autosave, or the student changing their answer) appends a new item to `session.answers` instead of replacing it. The new item has `isCorrect: null`.
+- `GET /tests/sessions/:id/result` then builds each question's `isCorrect` / `obtainedMarks` and the chapter/topic `breakdown` from that last entry.
+- Seen live on session `6aeeac2df640d445803b6146`: `result.correctCount: 2`, `obtainedMarks: 4`, but both questions show `isCorrect: false`, `obtainedMarks: 0 / 2`, and the chapter breakdown shows `0 / 2`.
+- Fix: upsert one answer per `questionId` in `PATCH /tests/sessions/:id/answer`, and grade review entries from the final answer.
 
-**2. Rewards summary is still 0.** For the same user at the same time:
-- `GET /rewards/summary` returned `totalXp: 0`, `coins: 0`.
-- `GET /home` returned `totalXp: 50`, `coins: 10`, and the XP history had the matching entries.
-- The Rewards and Progress pages therefore show 0 while the header shows the real values. `dailyGoals` should be checked too.
+**2. Double test start still opens two sessions.** Two `POST /tests/:id/start` calls sent together created `…6145` and `…6146`. The handoff says re-starting resumes the active session, but concurrent starts race. Please enforce one active session per student and test (unique index or transaction). The web app now sends only one request per start, but other clients may not.
 
-**3. Correct mistake retry gives no XP.** `POST /mistakes/:id/retry` with a correct answer resolved the mistake, but no XP entry was created. `/rewards/how-to-earn` promises `MISTAKE_REVIEW: 5`. The response has no `awarded` block. Please award the XP and return `awarded: { xp, coins }`.
+**3. Failed follow-up leaks provider details and still uses quota.**
+- `POST /doubts/:id/follow-up` with "Can you explain it with a simpler example?" returned HTTP 400: "Groq could not accept this request. Check that the input format and size are supported."
+- `/doubts/quota` then showed `usedToday: 2` after one answered doubt.
+- The handoff says provider failures return 503 and are not charged. Please return 503 `SERVICE_UNAVAILABLE` with a neutral message, don't count the failed call, and check why Groq rejects the follow-up request.
 
-**4. Activity strip misses today.** On 31 Oct, after answering 5 questions, `GET /progress/summary` returned `activity.strip` for 24–30 Oct only, and `activeDaysLast7: 0` while `activeDaysThisMonth: 1`. The strip must end on today (IST).
+## Other issues (P1)
 
-### P1: data quality
+**4.** Old test results were not recalculated with the new scoring. The 31 Oct attempt still shows 1 / 2 and "failed". Please backfill.
 
-**5. Syllabus touched.** `learning.syllabusTouchedPercent` is 0 although 5 of 28 topics have attempts.
+**5.** `learning.syllabusTouchedPercent` is still 0 with 7 topics studied.
 
-**6. Breakdown placement.** On challenge, practice and test responses, `breakdown` is inside `questions[0]` instead of at the top level. On challenge and practice completion, `chapterName` and `topicName` inside it are `null`. Move it to the top level with names filled in, and count only answered questions (skipped questions currently appear as 0% topics).
+**6.** `GET /doubts` returns `topicName: null` for a doubt about linear equations.
 
-**7. Practice `passed`.** `POST /practice/:id/complete` returns `passed: false` at 100%. Practice has no pass mark, so return `null` or remove the field.
+**7.** Old `ACTIVE` test sessions that have expired still appear in `/tests/history` with `isSession: true`. Finalise expired sessions, or mark them `EXPIRED`.
 
-**8. `timeTakenSeconds` and `rank` on the test result.** Both are missing from `GET /tests/sessions/:id/result`. The frontend works out the time from test history for now, and shows "—" for rank until `rank: { position, outOf, percentile }` is returned.
+**8.** Simpler explanation is still disabled (503 "not enabled in the limited Groq integration"). The web app hides the button until it is enabled.
 
-**9. Double test start.** Two `POST /tests/:id/start` calls fired together created two sessions (`...e7b2` and `...e7b3`). Make start safe against this race, for example with a unique index on one active session per student and test.
+**9.** Image doubts are unsupported (503). The web app shows "Photo questions are coming soon".
 
-**10. Reward rule to confirm.** A student with an unverified email received 10 coins. Should coins require a verified email? The frontend no longer says they do.
+**10.** Response time: `GET /daily-challenge` 2–6 s, `GET /home` about 4 s.
 
-**11. Admin student detail.** `GET /admin/students/:id` returns only `learningSummary { attempts, accuracy, testsAttempted }`. The collection promises a streak and gamification summary. Please add `totalXp`, `coins` and `currentStreak`.
+## Still to configure
 
-**12. Admin student list.** `GET /admin/students` has no consent fields and no last-activity time (`lastLoginAt` only). Please add `consentedAt` and `lastActiveAt`.
+| Item | Status |
+|---|---|
+| Firebase Storage bucket + CORS (`PUT` from the web domain) | Not configured: `POST /admin/uploads/signed-url` returned 503 on 7 Nov. Needed for voice doubts and admin PDF upload |
+| Admin 2FA enforcement | Not enforced: protected admin routes returned 200 without a verified code on 7 Nov. Turn it on for production admins |
+| Speech-to-text provider | Needed for voice doubts |
+| Brevo + report link `https://<domain>/parent-report/view?token=…` | Parent report email and email OTP |
+| App Check | If `FIREBASE_APP_CHECK_REQUIRED=true` is set, give the web team the reCAPTCHA v3 site key for `VITE_FIREBASE_APPCHECK_SITE_KEY` |
+| CORS | Currently `*`; restrict to the production web domain |
 
-**13. Audit log.** Entries have no `before` / `after` values (only `metadata`), and `/admin/config` returns `updatedAt` and `updatedBy` as null. The doc asked for these so that changes can be traced.
+## Content
 
-**14. Curriculum list.** The admin curriculum screen makes one call per chapter to get topics (13+ calls per class). An option to return topics with chapters would make it load much faster.
-
-**15. Draft curriculum items are created live.** `POST /admin/curriculum/chapters` with `isActive: false` returned `isActive: true`, and the chapter appeared to students. The topic route behaves the same. The frontend now sets draft straight after creating, but the create call should respect `isActive`.
-
-**16. Topics cannot be added to a draft chapter.** `POST /admin/curriculum/topics` returns "Parent chapter not found or inactive", so a chapter must be live before its topics can be prepared. Please allow it for admins.
-
-**17. Status casing.** `POST /admin/materials` accepts only lower-case `draft` / `published` / `archived`, while the collection shows `"DRAFT"`, and the status endpoints document upper case. Please accept both, or correct the collection.
-
-**18. Bulk import validate vs commit.** `/bulk-import/validate` accepted a boolean `correctAnswer`, then `/bulk-import` rejected it (`must be a string`). Validate must apply the same rules as the import.
-
-**19. Draft series.** Creating a `DRAFT` series with a draft test fails with "Only published tests can be added to a published series." The check should apply only to published series.
-
-**20. Rich text is stored unsanitised.** A material containing `<script>` was saved as-is and returned by the public API. The web app sanitises on display, but the backend should also sanitise on save, because other clients may not.
-
-**21. No delete for materials.** There is no `DELETE /admin/materials/:id`, so a wrong entry can only be archived.
-
-**22. Moderation reviewer.** `resolvedBy` is a raw user id. Please also return `resolvedByEmail`, so reviewers can see who acted.
-
-**23. Response time.** `GET /daily-challenge` took 2–6 s and `GET /home` about 4 s in this test (`/doubts/quota` took about 1.5 s for comparison). Please check indexes and the hosting plan; Render's free-tier cold starts also add delay.
-
----
+At the last check each chapter had only 1–3 published questions, and no study material was published in the topics checked. The Daily Challenge needs 5 eligible questions per class.
 
 ## Test data to remove before go-live
 
-Created during testing on 31 Oct 2026. All of it is hidden from students.
-
-| Item | ID | Where |
-|---|---|---|
-| Chapter "TEST - Chapter" (draft) | `6ae5c98f5f342a002015e7c5` | Class 8, chapter number 14 |
-| Topic "TEST - Topic" (draft) | `6ae5ca475f342a002015e7d3` | Inside that chapter |
-| 3 materials ("TEST - Notes", "Video lesson", "Notes (PDF)"; archived) | `6ae5cafc5f342a002015e7da`, `6ae5cb015f342a002015e7dd`, `6ae5cb055f342a002015e7e0` | Inside "TEST - Topic" |
-| Material "TEST - Notes" (archived) | `6ae5cad35f342a002015e7d6` | **On the real topic** "Properties of Rational Numbers" (Class 8, Rational Numbers) |
-| Test student data | User `6ae498487eed2b764699f614` | Challenge, practice, test attempts, mistakes, XP and coins |
-| Question report (dismissed) | `6ae5ce9d5f342a002015e809` | On "The square root of 3 (sqrt(3)) is an irrational number." |
-| Audit log entries | — | Test actions dated 31 Oct |
-
----
-
-| # | Task | Why it matters | Priority |
-|---|------|----------------|----------|
-| 1 | Configure the AI provider | Doubts and "simpler explanation" return 503 until this is done | P0 |
-| 2 | Configure `FIREBASE_STORAGE_BUCKET` and bucket CORS | Photo doubts, voice doubts and PDF uploads need it | P0 |
-| 3 | Configure the speech-to-text provider and ffprobe | Voice doubts return 503 until this is done | P1 |
-| 4 | Configure Brevo and the report-link URL | Parent report email and email OTP | P0 |
-| 5 | Add the production web domain to CORS | The site cannot call the API without it | P0 |
-| 6 | Publish content | See section 6 | P0 |
-| 7 | Confirm four small contract details | See section 7 | P1 |
-
----
-
-## 2. Storage CORS
-
-The browser uploads directly to the signed URL with `PUT`, so the bucket's CORS must allow:
-- **Origins:** the production domain and `http://localhost:5173`
-- **Methods:** `PUT`
-- **Headers:** `Content-Type`
-
-## 4. Parent report link
-
-The link in the email must point to the web app:
-
-`https://<production-domain>/parent-report/view?token=<signed token>`
-
-## 6. Content
-
-1. **Questions.** Each chapter had only 1–3 published questions at the last check (31 Oct). Daily Challenge, practice and tests need at least 15–20 per topic.
-2. **Study materials.** No study material was published in the topics checked on 31 Oct. Every topic shows "Notes coming soon".
-3. **Maths formatting.** Write maths as LaTeX inside `$…$`, and explanations as one step per line.
-
-## 7. Contract details to confirm
-
-The collection has no example responses for these. The frontend accepts the likely field names, but please confirm the exact ones or add saved examples:
-
-1. **`GET /admin/moderation`:** how a doubt report differs from a question report (the frontend looks for `doubtId`), and the field names of the resolution and of who resolved it.
-2. **2FA guard:** the `errorCode` returned when an admin has not passed 2FA (the frontend looks for `2FA`, `TWO_FACTOR` or `MFA`), and what `POST /admin/auth/2fa/setup` returns for an admin who is already enrolled.
-3. **`GET /leaderboard`:** the field marking the current user's row, and the name of the current-user rank block.
-4. **`GET /mistakes/:id`:** the exact field names of the submitted answer, the archive state and the question snapshot.
+| Item | ID |
+|---|---|
+| Chapter "TEST - Chapter" (draft), Class 8 | `6ae5c98f5f342a002015e7c5` |
+| Topic "TEST - Topic" (draft) | `6ae5ca475f342a002015e7d3` |
+| 3 archived materials in that topic | `6ae5cafc5f342a002015e7da`, `6ae5cb015f342a002015e7dd`, `6ae5cb055f342a002015e7e0` |
+| Archived material on the real topic "Properties of Rational Numbers" | `6ae5cad35f342a002015e7d6` |
+| Dismissed question report | `6ae5ce9d5f342a002015e809` |
+| AI answer report (open) and doubt | doubt `6aeeaccef640d445803b614d` |
+| Test student and all its activity | user `6ae498487eed2b764699f614` |

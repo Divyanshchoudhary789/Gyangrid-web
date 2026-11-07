@@ -1,5 +1,6 @@
 import { env } from '@/config/env';
 import { ApiError, ERROR_CODES, mapBackendError } from './errors';
+import { getAppCheckToken } from './auth/appCheck';
 
 /**
  * Single HTTP entry point for the whole app.
@@ -43,7 +44,7 @@ async function viaMock(method, path, body, token) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function viaFetch(method, path, body, token, { timeout, signal }) {
+async function viaFetch(method, path, body, token, { timeout, signal, headers: extra }) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
   const onAbort = () => controller.abort();
@@ -51,11 +52,14 @@ async function viaFetch(method, path, body, token, { timeout, signal }) {
   let res;
   const hasBody = body != null && method !== 'GET';
   const isForm = typeof FormData !== 'undefined' && body instanceof FormData; // multipart: the browser sets the boundary
+  const appCheck = await getAppCheckToken();
   try {
     res = await fetch(`${env.apiBaseUrl}${path}`, {
       method,
       headers: {
         Accept: 'application/json',
+        ...(appCheck ? { 'X-Firebase-AppCheck': appCheck } : {}),
+        ...(extra || {}),
         ...(hasBody && !isForm ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
@@ -85,6 +89,7 @@ async function viaFetch(method, path, body, token, { timeout, signal }) {
  *  - auth: false → send no token (public endpoints)
  *  - ai: longer timeout
  *  - skipAuthRedirect: don't bounce to the sign-in page on 401
+ *  - headers: extra request headers (e.g. Idempotency-Key)
  */
 export async function request(method, path, body, opts = {}) {
   if (isMockMode()) {
@@ -103,7 +108,7 @@ export async function request(method, path, body, opts = {}) {
   let token = await getToken(false);
   for (let attempt = 0; ; attempt += 1) {
     try {
-      return await viaFetch(method, path, body, token, { timeout, signal: opts.signal });
+      return await viaFetch(method, path, body, token, { timeout, signal: opts.signal, headers: opts.headers });
     } catch (err) {
       if (!(err instanceof ApiError)) throw err;
       // An expired ID token: refresh once and retry the same request.
@@ -117,6 +122,8 @@ export async function request(method, path, body, opts = {}) {
         continue;
       }
       if (err.code === ERROR_CODES.UNAUTHENTICATED && !opts.skipAuthRedirect) unauthorizedHandler(opts.scope);
+      // The admin 2FA session (12 h) has lapsed: the admin console asks for a fresh code.
+      if (err.code === ERROR_CODES.TWO_FACTOR_REQUIRED && typeof window !== 'undefined') window.dispatchEvent(new Event('gg:two-factor-required'));
       throw err;
     }
   }
