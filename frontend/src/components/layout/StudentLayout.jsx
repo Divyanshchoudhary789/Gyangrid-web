@@ -15,7 +15,7 @@ import { classLabel, boardLabel } from '@/features/shared/userDisplay';
 
 const PRIMARY = [
   { to: '/home', label: 'Home', icon: House },
-  { to: '/learn', label: 'Learn', icon: BookOpen },
+  // { to: '/learn', label: 'Learn', icon: BookOpen },
   { to: '/practice', label: 'Practice', icon: Target },
   { to: '/doubts', label: 'Ask a Doubt', short: 'Doubts', icon: MessageCircleQuestion },
 ];
@@ -164,7 +164,7 @@ export function StudentLayout() {
 
       {/* Mobile bottom navigation */}
       <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 border-t border-ink-100 bg-white/95 backdrop-blur-md lg:hidden" aria-label="Main">
-        <div className="mx-auto grid h-16 max-w-md grid-cols-5">
+        <div className="mx-auto grid h-16 max-w-md" style={{ gridTemplateColumns: `repeat(${PRIMARY.length + 1}, minmax(0, 1fr))` }}>
           {[...PRIMARY, { to: '/profile', label: 'Profile', icon: UserRound }].map((i) => (
             <NavLink key={i.to} to={i.to} className={({ isActive }) => cn('relative flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold transition', isActive ? 'text-brand-600' : 'text-ink-400')}>
               {({ isActive }) => (
