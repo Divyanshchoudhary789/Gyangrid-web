@@ -10,6 +10,7 @@ import { ERROR_CODES, errorMessage } from '@/services/errors';
 import { formatDateTime, timeAgo } from '@/lib/date';
 import { formatNumber } from '@/lib/format';
 import { AdminPageHeader, AdminTable, StatusBadge, supports, ADMIN_CAPS } from './adminShared';
+import { cn } from '@/lib/cn';
 
 /** AI knowledge base manager: upload approved docs, trigger indexing, view status, remove. */
 function KnowledgeBasePageFull() {

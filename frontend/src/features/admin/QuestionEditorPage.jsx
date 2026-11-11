@@ -255,6 +255,14 @@ export default function QuestionEditorPage() {
   const [confirmRetire, setConfirmRetire] = useState(false);
   useDocumentTitle(isNew ? 'New question' : REAL ? 'Edit question' : questionId);
 
+  /* ── Refs for text & option toolbars ── */
+  const questionRef = useRef(null);
+  const optRef0 = useRef(null);
+  const optRef1 = useRef(null);
+  const optRef2 = useRef(null);
+  const optRef3 = useRef(null);
+  const optionRefs = [optRef0, optRef1, optRef2, optRef3];
+
   useEffect(() => {
     if (!existing) return;
     setForm({
@@ -345,12 +353,6 @@ export default function QuestionEditorPage() {
   const explanationSteps = form.explanation.split('\n').filter((s) => s.trim());
   const correctAnswerKey = form.type === 'MCQ_SINGLE' ? form.correctAnswer : null;
   const correctIdx = correctAnswerKey ? OPTION_KEYS.indexOf(correctAnswerKey) : -1;
-
-  /* ── Refs for option toolbars ── */
-  const questionRef = useRef(null);
-  const explanationRef = useRef(null);
-  const conceptRef = useRef(null);
-  const optionRefs = [useRef(null), useRef(null), useRef(null), useRef(null)];
 
   return (
     <div>

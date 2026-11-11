@@ -111,7 +111,7 @@ function VisualBlockBuilder({ htmlContent, onChange }) {
         case 'tip':
           return `<div class="p-3 my-2 rounded-xl bg-sky-50 border border-sky-200 text-sm text-sky-900 flex items-start gap-2">\n  <span>💡</span><div><strong>${b.title}:</strong> ${b.content}</div>\n</div>`;
         case 'points':
-          return `<div class="my-3">\n  <h3 class="font-bold text-ink-900 mb-2">${b.title}</h3>\n  <ul class="list-disc pl-5 space-y-1 text-ink-800">\n${b.content.split('\n').filter(Boolean).map((pt) => `    <li>${pt.replace(/^[•\-\*]\s*/, '')}</li>`).join('\n')}\n  </ul>\n</div>`;
+          return `<div class="my-3">\n  <h3 class="font-bold text-ink-900 mb-2">${b.title}</h3>\n  <ul class="list-disc pl-5 space-y-1 text-ink-800">\n${b.content.split('\n').filter(Boolean).map((pt) => `    <li>${pt.replace(/^[•\-*]\s*/, '')}</li>`).join('\n')}\n  </ul>\n</div>`;
         default:
           return `<p>${b.content}</p>`;
       }
