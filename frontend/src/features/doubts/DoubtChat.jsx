@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import { Lightbulb, ListOrdered, CheckCircle2, Flag, Send, Star, ThumbsUp, ThumbsDown, Sparkles, MessageCircleQuestion, ShieldCheck } from 'lucide-react';
+import { Lightbulb, ListOrdered, CheckCircle2, Flag, Send, Star, ThumbsUp, ThumbsDown, Sparkles, MessageCircleQuestion, ShieldCheck, Volume2, VolumeX } from 'lucide-react';
 import { PageHeader, Card, Button, PageSkeleton, ErrorState, Alert, Modal, TextArea, Badge, ChoiceCard } from '@/components/ui';
 import { MathText } from '@/components/math/MathText';
 import { useQuery, invalidate } from '@/hooks/useQuery';
@@ -30,6 +30,83 @@ const STAGES = ['Reading your follow-up…', 'Finding a simpler way…', 'Writin
 // so internal provider details never reach the screen.
 const SHOW_AS_IS = [ERROR_CODES.FOLLOW_UP_LIMIT, ERROR_CODES.QUOTA_EXCEEDED, ERROR_CODES.RATE_LIMITED, ERROR_CODES.NETWORK, ERROR_CODES.TIMEOUT];
 const followUpMessage = (e) => (SHOW_AS_IS.includes(e.code) ? errorMessage(e) : 'Your tutor couldn’t answer that follow-up just now. Try rephrasing it, or ask a new doubt.');
+
+function SpeechButton({ text }) {
+  const [state, setState] = useState('idle');
+  const audioRef = useRef(null);
+  const objectUrlRef = useRef(null);
+  const requestRef = useRef(null);
+
+  const release = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+      audioRef.current = null;
+    }
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
+  };
+
+  useEffect(() => () => {
+    requestRef.current?.abort();
+    audioRef.current?.pause();
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+  }, []);
+
+  const stop = () => {
+    release();
+    setState('idle');
+  };
+
+  const speak = async () => {
+    if (state === 'playing') {
+      stop();
+      return;
+    }
+    if (state !== 'idle') return;
+
+    const controller = new AbortController();
+    requestRef.current = controller;
+    setState('loading');
+    try {
+      const blob = await doubtApi.synthesizeSpeech(text, { signal: controller.signal });
+      const objectUrl = URL.createObjectURL(blob);
+      objectUrlRef.current = objectUrl;
+      const audio = new Audio(objectUrl);
+      audioRef.current = audio;
+      audio.onended = stop;
+      audio.onerror = () => {
+        stop();
+        toast.error('Audio playback failed. Please try again.');
+      };
+      await audio.play();
+      setState('playing');
+    } catch (e) {
+      release();
+      setState('idle');
+      if (e.name !== 'AbortError') toast.error(errorMessage(e));
+    } finally {
+      requestRef.current = null;
+    }
+  };
+
+  const tooLong = text.trim().length > 4096;
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      leftIcon={state === 'playing' ? VolumeX : Volume2}
+      loading={state === 'loading'}
+      disabled={!text.trim() || tooLong || state === 'loading'}
+      title={tooLong ? 'This answer is too long to read aloud.' : undefined}
+      onClick={speak}
+    >
+      {state === 'playing' ? 'Stop audio' : 'Listen'}
+    </Button>
+  );
+}
 
 /** The structured answer returned right after asking; a reload falls back to the saved messages. */
 function FreshAnswer({ answer }) {
@@ -201,10 +278,12 @@ export function DoubtChat() {
 
   // With the structured answer in hand, it replaces the first tutor message.
   const firstTutor = d.messages.findIndex((m) => m.role === 'tutor');
+  const latestTutorText = [...d.messages].reverse().find((m) => m.role === 'tutor')?.text || '';
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader back={{ to: '/doubts', label: 'Doubts' }} title="Your doubt" subtitle={d.createdAt ? formatDateTime(d.createdAt) : undefined} action={<Badge tone="brand" icon={MessageCircleQuestion}>{d.followUpsLeft} follow-up{d.followUpsLeft === 1 ? '' : 's'} left</Badge>} />
 
+      {latestTutorText && <div className="mb-2 flex justify-end"><SpeechButton key={latestTutorText} text={latestTutorText} /></div>}
       <div className="space-y-4" aria-live="polite">
         {d.messages.map((m, i) => (fresh && i === firstTutor
           ? <FreshAnswer key={m.id} answer={fresh} />
