@@ -44,7 +44,7 @@ async function viaMock(method, path, body, token) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function viaFetch(method, path, body, token, { timeout, signal, headers: extra }) {
+async function viaFetch(method, path, body, token, { timeout, signal, headers: extra, responseType }) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
   const onAbort = () => controller.abort();
@@ -75,6 +75,9 @@ async function viaFetch(method, path, body, token, { timeout, signal, headers: e
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener('abort', onAbort);
+  }
+  if (responseType === 'blob' && res.ok) {
+    try { return await res.blob(); } catch { throw new ApiError(ERROR_CODES.NETWORK, undefined, { status: 0 }); }
   }
   let json = null;
   try { json = await res.json(); } catch { /* empty or non-JSON body */ }
@@ -108,7 +111,12 @@ export async function request(method, path, body, opts = {}) {
   let token = await getToken(false);
   for (let attempt = 0; ; attempt += 1) {
     try {
-      return await viaFetch(method, path, body, token, { timeout, signal: opts.signal, headers: opts.headers });
+      return await viaFetch(method, path, body, token, {
+        timeout,
+        signal: opts.signal,
+        headers: opts.headers,
+        responseType: opts.responseType,
+      });
     } catch (err) {
       if (!(err instanceof ApiError)) throw err;
       // An expired ID token: refresh once and retry the same request.
@@ -138,6 +146,7 @@ const qs = (params) => {
 export const http = {
   get: (path, params, opts) => request('GET', `${path}${qs(params)}`, null, opts),
   post: (path, body, opts) => request('POST', path, body ?? {}, opts),
+  postBlob: (path, body, opts = {}) => request('POST', path, body ?? {}, { ...opts, responseType: 'blob' }),
   put: (path, body, opts) => request('PUT', path, body ?? {}, opts),
   patch: (path, body, opts) => request('PATCH', path, body ?? {}, opts),
   del: (path, body, opts) => request('DELETE', path, body ?? undefined, opts),

@@ -2,7 +2,7 @@ import { http } from '../../http';
 import { ApiError, ERROR_CODES } from '../../errors';
 import { storage } from '@/lib/storage';
 import { list } from './mappers';
-import { putToSignedUrl } from './uploads';
+import { uploadToSignedUrl } from './uploads';
 
 /**
  * AI Doubt Solver. The backend model is a conversation: a doubt is answered once, then allows up to
@@ -66,11 +66,11 @@ async function listDoubts() {
   };
 }
 
-/** Signed URL → direct PUT → owned uploadId that doubt / transcription calls can reference. */
+/** Signed URL → direct upload → owned uploadId that doubt / transcription calls can reference. */
 async function uploadMedia({ kind, blob }) {
   const contentType = (blob.type || (kind === 'IMAGE' ? 'image/jpeg' : 'audio/webm')).split(';')[0];
   const up = await http.post('/uploads/signed-url', { kind, contentType, sizeBytes: blob.size });
-  await putToSignedUrl(up, blob);
+  await uploadToSignedUrl(up, blob);
   return up.uploadId;
 }
 
@@ -94,6 +94,10 @@ async function transcribe(blob) {
   return { transcript: r.text || '' };
 }
 
+async function synthesizeSpeech(text, { signal } = {}) {
+  return http.postBlob('/speech/synthesize', { text }, { ai: true, signal });
+}
+
 async function feedback(id, { understood, rating }) {
   const r = await http.post(`/doubts/${id}/feedback`, { understood, ...(rating ? { rating } : {}) });
   const saved = { understood, rating: rating || null };
@@ -114,8 +118,7 @@ async function report(id, { reason, note }) {
 export const doubtApi = {
   available: true,
   chat: true,
-  // The backend's AI provider can't read images yet; photo questions return 503.
-  imageSolving: false,
+  imageSolving: true,
   quota,
   list: listDoubts,
   get: async (id) => mapDoubt(await http.get(`/doubts/${id}`)),
@@ -127,4 +130,5 @@ export const doubtApi = {
   feedback,
   report,
   transcribe,
+  synthesizeSpeech,
 };
