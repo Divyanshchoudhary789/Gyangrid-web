@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Keyboard, Camera, Mic, Send, Sparkles, History, CheckCircle2, AlertCircle, Clock, Ban, RefreshCw, ShieldCheck } from 'lucide-react';
@@ -13,7 +13,7 @@ import { timeAgo, formatDateTime } from '@/lib/date';
 import { track } from '@/lib/analytics';
 import { AI_REFUSAL_MESSAGE, DOUBT_LIMITS } from '@/config/constants';
 import { cn } from '@/lib/cn';
-import { MathKeypad } from './MathKeypad';
+import { MathComposer } from './MathComposer';
 import { ImageDoubtInput } from './ImageDoubtInput';
 import { VoiceDoubtInput } from './VoiceDoubtInput';
 import { MathText } from '@/components/math/MathText';
@@ -72,22 +72,10 @@ function DoubtsPageFull() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [refusal, setRefusal] = useState(null);
-  const textRef = useRef(null);
   const { data: history, loading: historyLoading } = useQuery('doubts', doubtApi.list);
   const quota = history?.quota;
 
   useEffect(() => { setMode(initialMode); }, [initialMode]);
-
-  const insert = (sym) => {
-    const el = textRef.current;
-    const ch = sym === '−' ? '-' : sym;
-    if (!el) { setText((t) => t + ch); return; }
-    const start = el.selectionStart ?? text.length;
-    const end = el.selectionEnd ?? text.length;
-    const next = (text.slice(0, start) + ch + text.slice(end)).slice(0, DOUBT_LIMITS.maxTextChars);
-    setText(next);
-    requestAnimationFrame(() => { el.focus(); el.setSelectionRange(start + ch.length, start + ch.length); });
-  };
 
   const canSend = online && !busy && (
     (mode === 'text' && sanitizeText(text).length >= 3)
@@ -165,19 +153,16 @@ function DoubtsPageFull() {
               </div>
 
               {mode === 'text' && (
-                <div className="space-y-3">
-                  <TextArea
-                    ref={textRef} label="Type your question" value={text} onChange={(e) => setText(e.target.value)} maxLength={DOUBT_LIMITS.maxTextChars}
-                    placeholder="e.g. Solve 3(x − 2) = 2x + 5, or explain why (a + b)² ≠ a² + b²" rows={5} textareaClassName="text-base"
-                  />
-                  <MathKeypad onInsert={insert} />
-                </div>
+                <MathComposer
+                  label="Type your question" value={text} onChange={setText} maxLength={DOUBT_LIMITS.maxTextChars} rows={4}
+                  placeholder="e.g. Solve 3(x − 2) = 2x + 5, or explain why (a + b)² ≠ a² + b²"
+                />
               )}
               {mode === 'image' && !PHOTO_SOLVING && (
                 <div className="flex flex-col items-center rounded-2xl border border-dashed border-ink-200 bg-ink-50/60 px-4 py-10 text-center">
                   <Camera className="h-10 w-10 text-ink-300" aria-hidden />
                   <p className="mt-3 font-display text-lg font-bold text-ink-800">Photo questions are coming soon</p>
-                  <p className="mt-1 max-w-sm text-sm text-ink-500">For now, type your question or say it out loud. The maths keypad helps with symbols.</p>
+                  <p className="mt-1 max-w-sm text-sm text-ink-500">For now, type your question or say it out loud. The maths keyboard has every symbol you need.</p>
                   <div className="mt-5 flex flex-wrap justify-center gap-2">
                     <Button size="sm" leftIcon={Keyboard} onClick={() => setMode('text')}>Type it</Button>
                     <Button size="sm" variant="outline" leftIcon={Mic} onClick={() => setMode('voice')}>Say it</Button>

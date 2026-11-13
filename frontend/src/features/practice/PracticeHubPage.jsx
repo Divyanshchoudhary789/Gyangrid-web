@@ -55,7 +55,7 @@ export default function PracticeHubPage() {
           <span className="flex-1"><span className="block font-bold text-ink-900">Tests</span><span className="text-sm text-ink-500">Timed chapter tests & full mock tests</span></span>
           <ChevronRight className="h-5 w-5 text-ink-300" />
         </Link>
-        <Link to="/tests#series" className="card card-hover flex items-center gap-4 p-5">
+        <Link to="/tests/series" className="card card-hover flex items-center gap-4 p-5">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-sky-600"><Layers className="h-6 w-6" /></span>
           <span className="flex-1"><span className="block font-bold text-ink-900">Test Series</span><span className="text-sm text-ink-500">Unlock tests one by one</span></span>
           <ChevronRight className="h-5 w-5 text-ink-300" />

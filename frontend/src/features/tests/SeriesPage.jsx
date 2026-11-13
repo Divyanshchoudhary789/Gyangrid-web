@@ -19,7 +19,7 @@ export default function SeriesPage() {
 
   return (
     <div>
-      <PageHeader back={{ to: '/tests#series', label: 'All tests' }} eyebrow={s.unlockMode === 'SEQUENTIAL' ? 'Unlocks one by one' : 'Open series'} title={s.title} subtitle={s.description} />
+      <PageHeader back={{ to: '/tests/series', label: 'All series' }} eyebrow={s.unlockMode === 'SEQUENTIAL' ? 'Unlocks one by one' : 'Open series'} title={s.title} subtitle={s.description} />
       <Card className="mb-6">
         <div className="mb-2 flex justify-between text-sm font-semibold"><span>Series progress</span><span>{p.completed}/{p.total} tests</span></div>
         <ProgressBar value={p.completed} max={p.total} tone="success" size="lg" />

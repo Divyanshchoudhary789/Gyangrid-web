@@ -1,8 +1,8 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate, Link } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate, Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  House, BookOpen, Target, MessageCircleQuestion, NotebookPen, ChartLine, Trophy, Gift, UserRound, Settings, LogOut, Flame, Coins, Zap, ChevronDown,
+  House, BookOpen, Target, Timer, Layers, MessageCircleQuestion, NotebookPen, ChartLine, Trophy, Gift, UserRound, Settings, LogOut, Flame, Coins, Zap, ChevronDown,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { formatNumber, firstName } from '@/lib/format';
@@ -17,6 +17,9 @@ const PRIMARY = [
   { to: '/home', label: 'Home', icon: House },
   // { to: '/learn', label: 'Learn', icon: BookOpen },
   { to: '/practice', label: 'Practice', icon: Target },
+  // Test series live at /tests/series/*; every other /tests/* page (detail, result) belongs to Tests.
+  { to: '/tests', label: 'Tests', icon: Timer, match: (p) => p.startsWith('/tests') && !p.startsWith('/tests/series') },
+  { to: '/tests/series', label: 'Test Series', icon: Layers, mobile: false, match: (p) => p.startsWith('/tests/series') },
   { to: '/doubts', label: 'Ask a Doubt', short: 'Doubts', icon: MessageCircleQuestion },
 ];
 const SECONDARY = [
@@ -24,6 +27,11 @@ const SECONDARY = [
   { to: '/progress', label: 'Progress', icon: ChartLine },
   { to: '/leaderboard', label: 'Leaderboard', icon: Trophy },
   { to: '/rewards', label: 'Rewards', icon: Gift },
+];
+
+const MOBILE_NAV = [
+  ...PRIMARY.filter((i) => i.mobile !== false).map((i) => (i.to === '/tests' ? { ...i, match: (p) => p.startsWith('/tests') } : i)),
+  { to: '/profile', label: 'Profile', icon: UserRound },
 ];
 
 function StatChips({ summary, compact }) {
@@ -89,23 +97,27 @@ function UserMenu({ user }) {
   );
 }
 
+/** Active when the route matches, using the item's own rule when it has one (NavLink alone can't tell /tests from /tests/series). */
+function useIsActive(item) {
+  const { pathname } = useLocation();
+  return item.match ? item.match(pathname) : pathname === item.to || pathname.startsWith(`${item.to}/`);
+}
+
 function SideLink({ item, badge }) {
+  const active = useIsActive(item);
   return (
-    <NavLink
+    <Link
       to={item.to}
-      className={({ isActive }) => cn(
+      aria-current={active ? 'page' : undefined}
+      className={cn(
         'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-semibold transition',
-        isActive ? 'bg-brand-600 text-white shadow-lift' : 'text-ink-600 hover:bg-white hover:text-ink-900',
+        active ? 'bg-brand-600 text-white shadow-lift' : 'text-ink-600 hover:bg-white hover:text-ink-900',
       )}
     >
-      {({ isActive }) => (
-        <>
-          <item.icon className={cn('h-5 w-5', isActive ? 'text-white' : 'text-ink-400 group-hover:text-brand-500')} aria-hidden />
-          <span className="flex-1">{item.label}</span>
-          {badge > 0 && <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-bold', isActive ? 'bg-white/25 text-white' : 'bg-rose-100 text-rose-600')}>{badge}</span>}
-        </>
-      )}
-    </NavLink>
+      <item.icon className={cn('h-5 w-5 shrink-0', active ? 'text-white' : 'text-ink-400 group-hover:text-brand-500')} aria-hidden />
+      <span className="flex-1 truncate">{item.label}</span>
+      {badge > 0 && <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-bold', active ? 'bg-white/25 text-white' : 'bg-rose-100 text-rose-600')}>{badge}</span>}
+    </Link>
   );
 }
 
@@ -162,23 +174,28 @@ export function StudentLayout() {
         </main>
       </div>
 
-      {/* Mobile bottom navigation */}
+      {/* Mobile bottom navigation: Test Series is a tab inside Tests here, so Tests covers every /tests page */}
       <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 border-t border-ink-100 bg-white/95 backdrop-blur-md lg:hidden" aria-label="Main">
-        <div className="mx-auto grid h-16 max-w-md" style={{ gridTemplateColumns: `repeat(${PRIMARY.length + 1}, minmax(0, 1fr))` }}>
-          {[...PRIMARY, { to: '/profile', label: 'Profile', icon: UserRound }].map((i) => (
-            <NavLink key={i.to} to={i.to} className={({ isActive }) => cn('relative flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold transition', isActive ? 'text-brand-600' : 'text-ink-400')}>
-              {({ isActive }) => (
-                <>
-                  {isActive && <motion.span layoutId="bottom-nav-pill" className="absolute top-1.5 h-8 w-12 rounded-full bg-brand-50" />}
-                  <i.icon className="relative h-5 w-5" aria-hidden />
-                  <span className="relative">{i.short || i.label}</span>
-                </>
-              )}
-            </NavLink>
-          ))}
+        <div className="mx-auto grid h-16 max-w-lg" style={{ gridTemplateColumns: `repeat(${MOBILE_NAV.length}, minmax(0, 1fr))` }}>
+          {MOBILE_NAV.map((i) => <BottomLink key={i.to} item={i} />)}
         </div>
       </nav>
     </div>
+  );
+}
+
+function BottomLink({ item }) {
+  const active = useIsActive(item);
+  return (
+    <Link
+      to={item.to}
+      aria-current={active ? 'page' : undefined}
+      className={cn('relative flex min-w-0 flex-col items-center justify-center gap-0.5 text-[11px] font-semibold transition', active ? 'text-brand-600' : 'text-ink-400')}
+    >
+      {active && <motion.span layoutId="bottom-nav-pill" className="absolute top-1.5 h-8 w-12 rounded-full bg-brand-50" />}
+      <item.icon className="relative h-5 w-5" aria-hidden />
+      <span className="relative max-w-full truncate px-0.5">{item.short || item.label}</span>
+    </Link>
   );
 }
 

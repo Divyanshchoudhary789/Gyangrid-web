@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, Info, XCircle, LoaderCircle, RefreshCw, SearchX } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -178,8 +179,19 @@ export function Avatar({ id, size = 'md', className, ring }) {
 
 /* ------------------------------------------------------------------ Tabs / segmented control */
 export function Tabs({ tabs, value, onChange, className, size = 'md', ariaLabel = 'Tabs' }) {
+  const listRef = useRef(null);
+  // On narrow screens the strip scrolls sideways; keep the selected tab in view (e.g. when a URL opens a later tab).
+  useEffect(() => {
+    const list = listRef.current;
+    const tab = list?.querySelector('[aria-selected="true"]');
+    if (!list || !tab) return;
+    const left = tab.offsetLeft - list.offsetLeft;
+    if (left < list.scrollLeft || left + tab.offsetWidth > list.scrollLeft + list.clientWidth) {
+      list.scrollTo({ left: Math.max(0, left - 8), behavior: 'smooth' });
+    }
+  }, [value]);
   return (
-    <div role="tablist" aria-label={ariaLabel} className={cn('no-scrollbar inline-flex max-w-full gap-1 overflow-x-auto rounded-xl bg-ink-100 p-1', className)}>
+    <div ref={listRef} role="tablist" aria-label={ariaLabel} className={cn('no-scrollbar inline-flex max-w-full gap-1 overflow-x-auto rounded-xl bg-ink-100 p-1', className)}>
       {tabs.map((t) => {
         const active = t.value === value;
         return (

@@ -106,6 +106,7 @@ const router = createBrowserRouter([
                   { path: '/practice', element: <PracticeHub /> },
                   { path: '/practice/session/:setId', element: <PracticeSession /> },
                   { path: '/tests', element: <Tests /> },
+                  { path: '/tests/series', element: <Tests /> },
                   { path: '/tests/series/:seriesId', element: <Series /> },
                   { path: '/tests/result/:attemptId', element: <TestResult /> },
                   { path: '/tests/:testId', element: <TestDetail /> },

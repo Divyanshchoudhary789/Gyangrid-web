@@ -16,6 +16,7 @@ import { track } from '@/lib/analytics';
 import { cn } from '@/lib/cn';
 import { refreshSummary } from '@/features/shared/useHome';
 import { StagedProgress } from './DoubtsPage';
+import { MathComposer } from './MathComposer';
 
 const REPORT_REASONS = [
   { value: 'INCORRECT_ANSWER', label: 'The answer looks wrong', emoji: '❌' },
@@ -218,7 +219,7 @@ export function DoubtChat() {
       {!thinking && (
         d.followUpsLeft > 0 ? (
           <Card className="mt-5">
-            <TextArea label="Still confused? Ask a follow-up" value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} rows={2} placeholder="e.g. Can you explain that with a simpler example?" />
+            <MathComposer compact label="Still confused? Ask a follow-up" value={text} onChange={setText} maxLength={1000} rows={2} placeholder="e.g. Can you explain that with a simpler example?" />
             <div className="mt-3 flex items-center justify-between gap-3">
               <p className="flex items-center gap-1.5 text-xs text-ink-500"><ShieldCheck className="h-4 w-4 shrink-0 text-emerald-500" />Maths only. Don&apos;t share personal details.</p>
               <Button rightIcon={Send} disabled={clean.length < 3 || !online} onClick={send}>Ask</Button>
