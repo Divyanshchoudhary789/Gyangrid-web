@@ -35,6 +35,17 @@ afterEach(() => vi.unstubAllGlobals());
 const called = (method, path) => calls.find((c) => c.method === method && c.path === path);
 
 describe('AI doubts', () => {
+  it('receives OpenAI speech synthesis as an audio blob', async () => {
+    const audio = new Blob(['mock-mp3'], { type: 'audio/mpeg' });
+    const fetchMock = vi.fn(async () => ({ ok: true, status: 200, blob: async () => audio }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(doubtApi.synthesizeSpeech('Read this answer.')).resolves.toBe(audio);
+    expect(fetchMock.mock.calls[0][1].method).toBe('POST');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ text: 'Read this answer.' });
+    expect(new Headers(fetchMock.mock.calls[0][1].headers).get('Accept')).toBe('application/json');
+  });
+
   it('maps the structured answer', async () => {
     routes['POST /doubts'] = ok({ doubtId: 'd1', status: 'ANSWERED', refused: false, answer: { steps: ['Step 1'], finalAnswer: '$A$', conceptNote: 'Half' } }, 201);
     const r = await doubtApi.create({ text: 'Why half base times height?' });
@@ -81,18 +92,51 @@ describe('AI doubts', () => {
     expect(await doubtApi.report('d1', { reason: 'UNCLEAR' })).toEqual({ reported: true, duplicate: true });
   });
 
-  it('uploads a photo before asking, without sending the bearer token to storage', async () => {
-    routes['POST /uploads/signed-url'] = ok({ uploadId: 'up1', url: 'https://storage.example/put', headers: { 'Content-Type': 'image/jpeg' } }, 201);
-    routes['PUT /put'] = { status: 200, body: null };
+  it('uploads a photo to Cloudinary before asking without sending the bearer token', async () => {
+    routes['POST /uploads/signed-url'] = ok({
+      uploadId: 'up1',
+      url: 'https://api.cloudinary.com/v1_1/example/image/upload',
+      method: 'POST',
+      fields: { api_key: 'test-key', timestamp: 123, signature: 'test-signature', type: 'authenticated' },
+    }, 201);
     routes['POST /doubts'] = ok({ doubtId: 'd2', status: 'ANSWERED', refused: false, answer: { steps: [] } }, 201);
     const blob = new Blob(['x'], { type: 'image/jpeg' });
-    const put = vi.fn(async () => ({ ok: true, status: 200 }));
+    const upload = vi.fn(async () => ({ ok: true, status: 200 }));
     const base = globalThis.fetch;
-    vi.stubGlobal('fetch', (url, init) => (String(url).startsWith('https://storage.example') ? put(url, init) : base(url, init)));
+    vi.stubGlobal('fetch', (url, init) => (String(url).startsWith('https://api.cloudinary.com') ? upload(url, init) : base(url, init)));
     await doubtApi.create({ imageBlob: blob });
-    expect(put.mock.calls[0][1].headers.Authorization).toBeUndefined();
+    expect(doubtApi.imageSolving).toBe(true);
+    expect(upload.mock.calls[0][1].method).toBe('POST');
+    expect(upload.mock.calls[0][1].headers).toBeUndefined();
+    expect([...upload.mock.calls[0][1].body.keys()]).toEqual(['api_key', 'timestamp', 'signature', 'type', 'file']);
     expect(called('POST', '/uploads/signed-url').body).toEqual({ kind: 'IMAGE', contentType: 'image/jpeg', sizeBytes: 1 });
     expect(called('POST', '/doubts').body).toEqual({ imageUploadId: 'up1' });
+  });
+
+  it('uploads voice audio to Cloudinary before requesting its transcription', async () => {
+    routes['POST /uploads/signed-url'] = ok({
+      uploadId: 'audio-up1',
+      url: 'https://api.cloudinary.com/v1_1/example/video/upload',
+      method: 'POST',
+      fields: { api_key: 'test-key', timestamp: 123, signature: 'audio-signature', type: 'authenticated' },
+    }, 201);
+    routes['POST /speech/transcribe'] = ok({ text: 'Solve two plus two.' });
+    const blob = new Blob(['voice'], { type: 'audio/webm' });
+    const upload = vi.fn(async () => ({ ok: true, status: 200 }));
+    const base = globalThis.fetch;
+    vi.stubGlobal('fetch', (url, init) => (String(url).startsWith('https://api.cloudinary.com') ? upload(url, init) : base(url, init)));
+
+    await expect(doubtApi.transcribe(blob)).resolves.toEqual({ transcript: 'Solve two plus two.' });
+
+    expect(upload.mock.calls[0][1].method).toBe('POST');
+    expect(upload.mock.calls[0][1].headers).toBeUndefined();
+    expect([...upload.mock.calls[0][1].body.keys()]).toEqual(['api_key', 'timestamp', 'signature', 'type', 'file']);
+    expect(called('POST', '/uploads/signed-url').body).toEqual({
+      kind: 'AUDIO',
+      contentType: 'audio/webm',
+      sizeBytes: blob.size,
+    });
+    expect(called('POST', '/speech/transcribe').body).toEqual({ uploadId: 'audio-up1' });
   });
 });
 

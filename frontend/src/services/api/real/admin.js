@@ -20,7 +20,7 @@ import { http } from '../../http';
 import { ApiError, ERROR_CODES, notAvailable } from '../../errors';
 import { firebaseSignIn, firebaseSignOut, currentFirebaseUser, authReady } from '../../auth/firebase';
 import { maskContact } from '@/lib/format';
-import { putToSignedUrl } from './uploads';
+import { uploadToSignedUrl } from './uploads';
 import { idOf, list, pageInfo, unwrap } from './mappers';
 
 const enc = encodeURIComponent;
@@ -263,7 +263,7 @@ async function uploadPdf(file) {
   if (file.type !== 'application/pdf') throw validation(['Please choose a PDF file.']);
   if (file.size > 20 * 1024 * 1024) throw validation(['PDFs must be under 20 MB.']);
   const up = await http.post('/admin/uploads/signed-url', { contentType: 'application/pdf', sizeBytes: file.size });
-  await putToSignedUrl(up, file);
+  await uploadToSignedUrl(up, file);
   const done = await http.post(`/admin/uploads/${enc(up.uploadId)}/complete`, {});
   return done.publicUrl || up.publicUrl;
 }
