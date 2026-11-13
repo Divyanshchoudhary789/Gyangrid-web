@@ -124,7 +124,7 @@ function FreshAnswer({ answer }) {
           <h3 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-brand-700"><ListOrdered className="h-4 w-4" />Step by step</h3>
           <ol className="space-y-3">
             {answer.steps.map((step, i) => (
-              <motion.li key={step} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.15 + i * 0.25 }} className="flex gap-3 text-[15.5px] leading-relaxed text-ink-800">
+              <motion.li key={`${i}-${step}`} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.15 + i * 0.25 }} className="flex gap-3 text-[15.5px] leading-relaxed text-ink-800">
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">{i + 1}</span>
                 <MathText text={step} className="min-w-0" />
               </motion.li>
@@ -141,6 +141,13 @@ function FreshAnswer({ answer }) {
   );
 }
 
+/** Splits a message into display lines, but never inside a multi-line $$…$$ or \[…\] block. */
+function messageLines(text) {
+  const s = String(text ?? '');
+  if (/\$\$|\\\[/.test(s)) return [s];
+  return s.split(/\n+/).filter((line) => line.trim());
+}
+
 function Bubble({ message }) {
   const mine = message.role === 'student';
   return (
@@ -148,7 +155,12 @@ function Bubble({ message }) {
       {!mine && <span className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-violet-600 text-white"><Sparkles className="h-4 w-4" aria-hidden /></span>}
       <div className={cn('min-w-0 max-w-[85%] rounded-2xl px-4 py-3 text-[15.5px] leading-relaxed sm:max-w-[75%]', mine ? 'rounded-br-md bg-brand-600 text-white' : 'rounded-bl-md border border-ink-100 bg-white text-ink-800 shadow-sm')}>
         {message.imageUrl && <img src={message.imageUrl} alt="Your question" loading="lazy" className="mb-2 max-h-64 rounded-xl" />}
-        <MathText as="p" text={message.text} className="whitespace-pre-wrap break-words" />
+        {/* Saved answers come back as one line per step; give each line its own row so long working stays readable. */}
+        <div className="space-y-1.5 break-words">
+          {messageLines(message.text).map((line, i) => (
+            <MathText key={i} as="p" text={line} className="whitespace-pre-wrap" />
+          ))}
+        </div>
       </div>
     </motion.div>
   );
